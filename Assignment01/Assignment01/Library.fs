@@ -64,9 +64,14 @@ module Thingies =
         | (str, 1) -> str
         | (str, _) -> str + pow_ (str, n - 1)
     
-    // 1.15
-    // let bin (x, y) =
+    // 1.15        
+    let rec fac n =
+        match n with
+        | 0 | 1 -> 1
+        | _ -> n * fac(n-1)   
 
+    let bin (n, k) = ((fac n) / ((fac k) * (fac (n-k))))
+    
     // 1.16
     // 1. int * int -> int
     // 2. When x >= 0
@@ -84,4 +89,5 @@ module Thingies =
     
     // 1.18
     let curry f = fun a -> fun b -> f (a, b)
+    
     let uncurry f = fun (a, b) -> f a b
