@@ -11,7 +11,7 @@ module Thingies =
     let g n = n + 4
 
     // 1.4
-    let h x y = System.Math.Sqrt(x * x + y * y)
+    let h (x,y) = System.Math.Sqrt(x * x + y * y)
 
     // 1.5
     let rec f = function
@@ -44,7 +44,7 @@ module Thingies =
     //       | g |-> "the add six function" |
 
     // 1.10
-    let dup str = str + str
+    let dup str: string = str + str
 
     // 1.11
     let rec dupn (str : string) n =
@@ -65,8 +65,12 @@ module Thingies =
         | (str, _) -> str + pow_ (str, n - 1)
     
     // 1.15
-    // let bin (x, y) =
-
+    let rec bin (n, k) =
+        match (n, k) with
+         | (n, 0) -> 1
+         | (n, k) when k = n -> 1
+         | (n, k) when n > k -> bin(n - 1, k - 1) + bin(n - 1, k)
+  
     // 1.16
     // 1. int * int -> int
     // 2. When x >= 0
@@ -83,5 +87,5 @@ module Thingies =
     // 3. This results in 0, because fact -1 is never evaluated
     
     // 1.18
-    let curry f = fun a -> fun b -> f (a, b)
-    let uncurry f = fun (a, b) -> f a b
+    let curry f = fun g -> fun h -> f (g, h)
+    let uncurry f = fun (g, h) -> f g h
