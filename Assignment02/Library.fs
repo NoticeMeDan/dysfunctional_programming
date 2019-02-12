@@ -42,7 +42,6 @@ module wee =
     let (|/|) ((a, b): complex) ((c, d): complex) =
         let divisor = c ** 2. + d ** 2.
         (a, b) |*| (c / divisor, -d / divisor)
-        complex (a, b) |*| (c / divisor, -d / divisor)
     
     // Exercise 2.6
     let rec altsum = function
@@ -55,11 +54,14 @@ module wee =
         match str with
         | x when x.Length.Equals 1 -> [x.[0]]
         | x -> x.[0] :: explode2 (str.Remove(0, 1))
+    
+    // Exercise 2.8
+    let implode (arr:char list) = List.foldBack (fun x acc -> string x + acc) arr ""
+    let implodeRev (arr: char list) = List.fold (fun acc x -> string x + acc) "" arr
         
     // Exercise 2.9
-    let toUpper (x: string) = x.ToUpper()
-    let toUpper1 (x: string) = explode1
-    let toUpper2 (x: string) = x |>  toUpper
-    
+    let toUpper (x: string)  = x.ToUpper()
+    let toUpper1 (x: string) = (explode1 >> List.map System.Char.ToUpper >> implode) x
+    let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
     
         
