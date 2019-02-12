@@ -42,3 +42,8 @@ module wee =
     let (|/|) ((a, b): complex) ((c, d): complex) =
         let divisor = c ** 2. + d ** 2.
         complex (a, b) |*| (c / divisor, -d / divisor)
+        
+    // Exercise 2.9
+    let toUpper (x: string) = x.ToUpper()
+    
+        
