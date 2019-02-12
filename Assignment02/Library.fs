@@ -65,4 +65,10 @@ module wee =
     let toUpper1 (x: string) = (explode1 >> List.map System.Char.ToUpper >> implode) x
     let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
     
+    // Exercise 2.11
+    let rec ack ((m:int), (n:int)) =
+        match (m,n) with
+        | (m,n) when m.Equals 0 -> n + 1
+        | (m,n) when m > 0 && n = 0 -> ack ((m-1),1)
+        | (m,n) when m >= 0 && n > 0 -> ack ((m-1),ack (m,(n-1)))
         
