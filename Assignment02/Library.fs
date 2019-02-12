@@ -41,4 +41,16 @@ module wee =
         
     let (|/|) ((a, b): complex) ((c, d): complex) =
         let divisor = c ** 2. + d ** 2.
-        complex (a, b) |*| (c / divisor, -d / divisor)
+        (a, b) |*| (c / divisor, -d / divisor)
+    
+    // Exercise 2.6
+    let rec altsum = function
+        | [] -> 0
+        | x0::xs -> x0 - altsum xs
+        
+    // Exercise 2.7
+    let explode1 (str: string) = List.ofArray(str.ToCharArray())
+    let rec explode2 (str: string) =
+        match str with
+        | x when x.Length.Equals 1 -> [x.[0]]
+        | x -> x.[0] :: explode2 (str.Remove(0, 1))
