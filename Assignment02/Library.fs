@@ -52,8 +52,9 @@ module wee =
     let explode1 (str: string) = List.ofArray(str.ToCharArray())
     let rec explode2 (str: string) =
         match str with
+        | "" -> []
         | x when x.Length.Equals 1 -> [x.[0]]
-        | x -> x.[0] :: explode2 (str.Remove(0, 1))
+        | x -> x.[0] :: explode2 (str.Remove(0, 1)) 
     
     // Exercise 2.8
     let implode (arr:char list) = List.foldBack (fun x acc -> string x + acc) arr ""
