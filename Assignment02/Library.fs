@@ -54,3 +54,7 @@ module wee =
         match str with
         | x when x.Length.Equals 1 -> [x.[0]]
         | x -> x.[0] :: explode2 (str.Remove(0, 1))
+    
+    // Exercise 2.8
+    let implode arr = List.foldBack (fun x acc -> x + acc) arr ""
+    let implodeRev arr = List.fold (fun acc x -> x + acc) "" arr
