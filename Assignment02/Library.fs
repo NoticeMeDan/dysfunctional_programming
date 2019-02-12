@@ -1,6 +1,8 @@
 ﻿namespace Assignment02
 
 module wee =
+    open System
+
     // Exercise 2.1
     let rec downto1 n = 
         if n > 0
@@ -63,6 +65,12 @@ module wee =
     // Exercise 2.9
     let toUpper (x: string)  = x.ToUpper()
     let toUpper1 (x: string) = (explode1 >> List.map System.Char.ToUpper >> implode) x
-    let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
+    let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode
     
-        
+    // Exercise 2.10
+    let palindrome2 str =
+        str
+        |> explode1
+        |> List.filter System.Char.IsLetter
+        |> List.map System.Char.ToUpper
+        |> (fun arr -> (implode arr).Equals (implode (List.rev arr)))
