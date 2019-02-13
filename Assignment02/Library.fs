@@ -199,21 +199,18 @@ module wee =
     
     let timeArg1 f a =
         time (fun () -> f a)
-    //let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
-
 
     // Exercise 2.13
     let downto3 f n e =
         if n > 0 then
             let items = [1..n]
             List.foldBack f items e
-        else
-            e
+        else e
     
-    let rec fac n =
-        match n with 
-        | 0 | 1 -> 1
-        | _ -> n * fac (n-1)
+    let fac n = downto3 (*) n 1
         
     let range g n =
-        downto3 g n
+        let appendFunc x y = (g x) :: y
+        downto3 appendFunc n []
+      
+    //then List.foldBack f [1..n] e
