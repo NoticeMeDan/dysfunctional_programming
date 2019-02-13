@@ -164,7 +164,20 @@ module wee =
     let toUpper (x: string)  = x.ToUpper()
     let toUpper1 (x: string) = (explode1 >> List.map System.Char.ToUpper >> implode) x
     let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
+
+
+    // Exercise 2.13
+    let downto3 f n e =
+        if n > 0 then
+            let items = [1..n]
+            List.foldBack f items e
+        else
+            e
     
+    let rec fac n =
+        match n with 
+        | 0 | 1 -> 1
+        | _ -> n * fac (n-1)
         
-        
-    
+    let range g n =
+        downto3 g n
