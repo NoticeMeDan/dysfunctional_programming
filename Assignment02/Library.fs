@@ -178,7 +178,7 @@ module wee =
     
     let palindrome2 str =
         str
-        |> explode1
+        |> explode1 
         |> List.filter System.Char.IsLetter
         |> List.map System.Char.ToUpper
         |> (fun arr -> (implode arr) = (implode (List.rev arr)))
@@ -190,3 +190,12 @@ module wee =
         | (m,n) when m > 0 && n = 0 -> ack ((m-1),1)
         | (m,n) when m >= 0 && n > 0 -> ack ((m-1),ack (m,(n-1)))
         
+    // Exercise 2.12
+    let time f =
+      let start = System.DateTime.Now in
+      let res = f () in
+      let finish = System.DateTime.Now in
+      (res, finish - start)
+    
+    let timeArg1 f a =
+        time (fun () -> f a)
