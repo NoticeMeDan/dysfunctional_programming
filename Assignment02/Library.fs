@@ -123,7 +123,7 @@ module wee =
             if (difference < 0 ) then (difference + 10, 1) else (difference, 0)
         
         if (borrow>0) then failwith("you're out of money")
-
+    
         (pounds = pounds, shilling = shilling, pence = pence)
     
     let toString2 (x:BCur2) =
@@ -153,7 +153,7 @@ module wee =
     let rec explode2 (str: string) =
         match str with
         | "" -> []
-        | x when x.Length.Equals 1 -> [x.[0]]
+        | x when x.Length = 1 -> [x.[0]]
         | x -> x.[0] :: explode2 (str.Remove(0, 1)) 
     
     // Exercise 2.8
@@ -163,7 +163,43 @@ module wee =
     // Exercise 2.9
     let toUpper (x: string)  = x.ToUpper()
     let toUpper1 (x: string) = (explode1 >> List.map System.Char.ToUpper >> implode) x
-    let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
+    let toUpper2 (x: string) = x |> explode1 |> List.map System.Char.ToUpper |> implode 
+    
+    // Exercise 2.10
+    let rec palindrome1 (str: string) =
+        match str.ToUpper() with
+        | x when not (System.Char.IsLetter x.[0]) -> palindrome1 x.[1..]
+        | x when not (System.Char.IsLetter x.[x.Length - 1]) -> palindrome1 x.[0..(x.Length - 2)]
+        | x when x.Length = 1 -> true
+        | x when x.Length = 2 -> x.[0] = x.[1]
+        | x when not (x.[0] = x.[x.Length - 1]) -> false
+        | x when x.[0] = x.[x.Length - 1] -> palindrome1 x.[1..(x.Length - 2)]
+        | _ -> false
+    
+    let palindrome2 str =
+        str
+        |> explode1 
+        |> List.filter System.Char.IsLetter
+        |> List.map System.Char.ToUpper
+        |> (fun arr -> (implode arr) = (implode (List.rev arr)))
+    
+    // Exercise 2.11
+    let rec ack ((m:int), (n:int)) =
+        match (m,n) with
+        | (m,n) when m.Equals 0 -> n + 1
+        | (m,n) when m > 0 && n = 0 -> ack ((m-1),1)
+        | (m,n) when m >= 0 && n > 0 -> ack ((m-1),ack (m,(n-1)))
+        
+    // Exercise 2.12
+    let time f =
+      let start = System.DateTime.Now in
+      let res = f () in
+      let finish = System.DateTime.Now in
+      (res, finish - start)
+    
+    let timeArg1 f a =
+        time (fun () -> f a)
+    //let toUpper2 (x: string) = explode1 x |> List.map System.Char.ToUpper |> implode 
 
 
     // Exercise 2.13
