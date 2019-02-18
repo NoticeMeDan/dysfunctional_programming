@@ -38,55 +38,51 @@ module Say =
             
     // 3.4
     type aExp =          (* arithmetical expressions *)
-    | N of int           (* numbers *)
-    | V of string        (* variables *)
-    | Add of aExp * aExp (* addition *)
-    | Mul of aExp * aExp (* multiplication *)
-    | Sub of aExp * aExp (* subtraction *)
+        | N of int           (* numbers *)
+        | V of string        (* variables *)
+        | Add of aExp * aExp (* addition *)
+        | Mul of aExp * aExp (* multiplication *)
+        | Sub of aExp * aExp (* subtraction *)
 
-    let unop  f a s   = f (a s)
-    let binop f a b s = f (a s) (b s)
-
-    let rec A =
-        function
-        | N n          -> fun _ -> n
-        | V x          -> Map.find x
-        | Add (a1, a2) -> binop ( + ) (A a1) (A a2)
-        | Mul (a1, a2) -> binop ( * ) (A a1) (A a2)
-        | Sub (a1, a2) -> binop ( - ) (A a1) (A a2)
-
+    let rec A e s =
+        match e with
+        | N n          -> n
+        | V x          -> Map.find x s
+        | Add (a1, a2) -> A a1 s + A a2 s
+        | Mul (a1, a2) -> A a1 s * A a2 s
+        | Sub (a1, a2) -> A a1 s - A a2 s
+        
     type bExp =          (* boolean expressions *)
-    | TT                 (* true *)
-    | FF                 (* false *)
-    | Eq of aExp * aExp  (* numeric equality *)
-    | Lt of aExp * aExp  (* numeric less than *)
-    | Neg of bExp        (* boolean not *)
-    | Con of bExp * bExp (* boolean conjunction *)
+        | TT                 (* true *)
+        | FF                 (* false *)
+        | Eq of aExp * aExp  (* numeric equality *)
+        | Lt of aExp * aExp  (* numeric less than *)
+        | Neg of bExp        (* boolean not *)
+        | Con of bExp * bExp (* boolean conjunction *)
 
-    (* TODO: Write a function B : bExp -> state -> bool
-             to evaluate boolean expressions (note that you will need to refer to A) *)
-
-
-    let rec B _ = failwith "Not implementd"
-
+    let rec B e s =
+        match e with
+        | TT          -> true
+        | FF          -> false
+        | Eq (a1, a2) -> A a1 s = A a2 s
+        | Lt (a1, a2) -> A a1 s < A a2 s
+        | Neg (b1)    -> (B b1 s)
+        | Con (b1, b2) -> (B b1 s) && (B b2 s)
 
     type stm =                (* statements *)
-    | Ass of string * aExp    (* variable assignment *)
-    | Skip                    (* nop *)
-    | Seq of stm * stm        (* sequential composition *)
-    | ITE of bExp * stm * stm (* if-then-else statement *)
-    | While of bExp * stm     (* while statement *)
+        | Ass of string * aExp    (* variable assignment *)
+        | Skip                    (* nop *)
+        | Seq of stm * stm        (* sequential composition *)
+        | ITE of bExp * stm * stm (* if-then-else statement *)
+        | While of bExp * stm     (* while statement *)
 
     let update = Map.add
 
-    (* TODO: Write I : stm -> state -> state. 
-             You can rewrite the skeleton if you want, but the signature must be the same *)
-
-
-    let rec I =
-      function 
-      | Ass (x,a)         -> failwith "Not implemented" (* use update *)
-      | Skip              -> failwith "Not implemented"
-      | Seq (stm1, stm2)  -> failwith "Not implemented"
-      | ITE (b,stm1,stm2) -> failwith "Not implemented"
-      | While (b, stm)    -> failwith "Not implemented"
+    let rec I e s =
+      match e with
+      | Ass (x, a)        -> update (x) (A a s) s
+      | Skip              -> s
+      | Seq (stm1, stm2)  -> let ss = I stm1 s in I stm2 ss
+      | ITE (b,stm1,stm2) -> if (B b s) then I stm1 s else I stm2 s
+      | While (b, stm)    -> if (B b s) then I stm s else s
+      
