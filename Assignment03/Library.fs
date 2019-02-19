@@ -78,25 +78,10 @@ module Say =
 
     let update = Map.add
 
-    let rec I e s =
-      match e with
+    let rec I stm s =
+      match stm with
       | Ass (x, a)        -> update (x) (A a s) s
       | Skip              -> s
       | Seq (stm1, stm2)  -> (I stm1 >> I stm2) s
       | ITE (b,stm1, stm2) -> if (B b s) then I stm1 s else I stm2 s
-      | While (b, stm)    -> if (B b s) then I stm s else s
-      
-    let factorial x =
-        Seq (Ass("x", N x),
-                ITE (Neg(Lt(V "x", N 0)),
-                     Seq (Ass("result", N 1),
-                          While(Lt(N 0, V "x"),
-                                 Seq(Ass("result", Mul(V "result", V "x")),
-                                      Ass("x", Sub(V "x", N 1))))),
-                     Skip))
-
-    let x = factorial 5
-    printfn "%A" x
-    printfn "%A" (I (factorial -5) Map.empty |> Map.toList |> List.sortBy fst)
-    
-    printfn "%A" (I (factorial 5) Map.empty |> Map.toList |> List.sortBy fst)
+      | While (a, b)     -> I (ITE (a,Seq(b, stm),Skip)) s
