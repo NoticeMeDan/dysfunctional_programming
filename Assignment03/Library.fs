@@ -75,13 +75,17 @@ module Say =
         | Seq of stm * stm        (* sequential composition *)
         | ITE of bExp * stm * stm (* if-then-else statement *)
         | While of bExp * stm     (* while statement *)
+        | IT of bExp * stm        (* If then, without else*)
+        | Repeat of stm * bExp    (* While, where condition is checked after first run *)
 
     let update = Map.add
 
     let rec I stm s =
       match stm with
-      | Ass (x, a)        -> update (x) (A a s) s
-      | Skip              -> s
-      | Seq (stm1, stm2)  -> (I stm1 >> I stm2) s
-      | ITE (b,stm1, stm2) -> if (B b s) then I stm1 s else I stm2 s
-      | While (a, b)     -> I (ITE (a,Seq(b, stm),Skip)) s
+      | Ass (x, a)         -> update (x) (A a s) s
+      | Skip               -> s
+      | Seq (stm1, stm2)   -> (I stm1 >> I stm2) s
+      | ITE (bExp, stm1, stm2)-> if (B bExp s) then I stm1 s else I stm2 s
+      | While (bExp, stm1) -> I (ITE (bExp, Seq(stm1, stm), Skip)) s
+      | IT (bExp, stm)        -> if (B bExp s) then I stm s else I Skip s
+      | Repeat (stm, bExp)    -> I(Seq (stm, While(bExp, stm))) s
