@@ -66,7 +66,7 @@ module Say =
         | FF          -> false
         | Eq (a1, a2) -> A a1 s = A a2 s
         | Lt (a1, a2) -> A a1 s < A a2 s
-        | Neg (b1)    -> (B b1 s)
+        | Neg (b1)    -> not (B b1 s)
         | Con (b1, b2) -> (B b1 s) && (B b2 s)
 
     type stm =                (* statements *)
@@ -82,7 +82,21 @@ module Say =
       match e with
       | Ass (x, a)        -> update (x) (A a s) s
       | Skip              -> s
-      | Seq (stm1, stm2)  -> let ss = I stm1 s in I stm2 ss
-      | ITE (b,stm1,stm2) -> if (B b s) then I stm1 s else I stm2 s
+      | Seq (stm1, stm2)  -> (I stm1 >> I stm2) s
+      | ITE (b,stm1, stm2) -> if (B b s) then I stm1 s else I stm2 s
       | While (b, stm)    -> if (B b s) then I stm s else s
       
+    let factorial x =
+        Seq (Ass("x", N x),
+                ITE (Neg(Lt(V "x", N 0)),
+                     Seq (Ass("result", N 1),
+                          While(Lt(N 0, V "x"),
+                                 Seq(Ass("result", Mul(V "result", V "x")),
+                                      Ass("x", Sub(V "x", N 1))))),
+                     Skip))
+
+    let x = factorial 5
+    printfn "%A" x
+    printfn "%A" (I (factorial -5) Map.empty |> Map.toList |> List.sortBy fst)
+    
+    printfn "%A" (I (factorial 5) Map.empty |> Map.toList |> List.sortBy fst)
