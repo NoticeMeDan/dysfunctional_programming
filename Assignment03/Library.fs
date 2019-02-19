@@ -86,3 +86,70 @@ module Say =
       | ITE (b,stm1,stm2) -> if (B b s) then I stm1 s else I stm2 s
       | While (b, stm)    -> if (B b s) then I stm s else s
       
+      
+     // 3.7
+    type Fexpr =
+    | Const of float
+    | Add of Fexpr * Fexpr
+    | Sub of Fexpr * Fexpr
+    | Mul of Fexpr * Fexpr
+    | Div of Fexpr * Fexpr
+    | Sin of Fexpr
+    | Cos of Fexpr
+    | Log of Fexpr
+    | Exp of Fexpr
+    
+    let rec evalFexpr = function
+        | Const x       -> float x
+        | Add(f1,f2)    -> evalFexpr f1 + evalFexpr f2
+        | Sub(f1,f2)    -> evalFexpr f1 - evalFexpr f2
+        | Mul(f1,f2)    -> evalFexpr f1 * evalFexpr f2
+        | Div(f1,f2)    -> evalFexpr f1 / evalFexpr f2
+        | Sin f         -> sin <| evalFexpr f
+        | Cos f         -> cos <| evalFexpr f
+        | Log f         -> log <| evalFexpr f
+        | Exp f         -> exp <| evalFexpr f
+
+    // 3.8
+    type Instruction =
+        | ADD | SUB | MULT | DIV | SIN | COS | LOG | EXP | PUSH of float
+    
+    type Stack = float list
+    
+    
+    let intpInstr instruction stack = 
+        match instruction, stack with
+        | ADD, x0::x1::xs    -> (x1 + x0)::xs
+        | SUB, x0::x1::xs    -> (x1 - x0)::xs
+        | MULT, x0::x1::xs   -> (x1 * x0)::xs
+        | DIV, x0::x1::xs    -> (x1 / x0)::xs
+        | SIN, x0::xs        -> (sin x0)::xs
+        | COS, x0::xs        -> (cos x0)::xs
+        | LOG, x0::xs        -> (log x0)::xs
+        | EXP, x0::xs        -> (exp x0)::xs
+        | PUSH(value), _     -> value::stack
+        | _ -> failwith "something went wrong..."
+    
+    let intpProg instructions =
+        let rec inner list (stack: float list) =
+            match list with
+            | [] -> stack.Head
+            | top::rest -> inner rest (intpInstr top stack)
+        inner instructions []
+        
+    let rec exprToInstrs expr =
+        match expr with
+        | Const(value) -> [PUSH(value)]
+        | Add(x0, x1)  -> (exprToInstrs x0) @ (exprToInstrs x1) @ [ADD]
+        | Sub(x0, x1)  -> (exprToInstrs x0) @ (exprToInstrs x1) @ [SUB]
+        | Mul(x0, x1)  -> (exprToInstrs x0) @ (exprToInstrs x1) @ [MULT]
+        | Div(x0, x1)  -> (exprToInstrs x0) @ (exprToInstrs x1) @ [DIV]
+        | Sin(expr)    -> (exprToInstrs expr ) @ [SIN]
+        | Cos(expr)    -> (exprToInstrs expr ) @ [COS]
+        | Log(expr)    -> (exprToInstrs expr ) @ [LOG]
+        | Exp(expr)    -> (exprToInstrs expr ) @ [EXP]
+        
+    let comp expr =
+        let x = evalFexpr expr
+        let y = intpProg <| exprToInstrs expr
+        (x,y)    
