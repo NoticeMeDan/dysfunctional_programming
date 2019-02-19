@@ -155,4 +155,86 @@ module Say =
     let comp expr =
         let x = evalFexpr expr
         let y = intpProg <| exprToInstrs expr
-        (x,y)      
+        (x,y)
+        
+
+    (* Exercise 3.9 *)
+
+    (* TODO: complete these types and functions (we use mk<Name> to create an interface to the testing environment). *)
+
+    (* type prop ... *)
+    type prop =
+        | Atom of string
+        | Neg of prop
+        | Conj of prop * prop
+        | Disj of prop * prop
+
+    (* TODO: create mkAtom : string -> prop *)
+    let mkAtom x = Atom x
+
+    (* TODO: create mkNeg : prop -> prop *)
+    let mkNeg x = Neg x
+
+    (* TODO: create mkConj : prop -> prop -> prop *)
+    let mkConj x y = Conj(x,y)
+
+    (* TODO: create mkDisj : prop -> prop -> prop *)
+    let mkDisj x y = Disj(x,y)
+
+    let mkImpl p q = mkDisj (mkNeg p) q
+    let mkBiImpl p q = mkConj (mkImpl p q) (mkImpl q p)
+
+    (* TODO: create nnf : prop -> prop *)
+    let rec nnf = function
+        | Neg(Conj(x,y))     -> Disj(nnf(Neg x), nnf(Neg y))
+        | Neg(Disj(x,y))     -> Conj(nnf(Neg x), nnf(Neg y))
+        | Neg(Neg(x))        -> nnf x
+        | Conj(x,y)          -> Conj(nnf x, nnf y)
+        | Disj(x,y)          -> Disj(nnf x, nnf y)
+        | prop               -> prop
+        
+    (* TODO: create cnf : prop -> prop *)
+    let rec cnf =
+        let rec inner = function
+            | Disj(p,Conj(q,r)) -> Conj(inner (Disj(p,q)), inner (Disj(p,r)))
+            | Disj(Conj(p,q),r) -> Conj(inner(Disj(p,r)), inner (Disj(q,r)))
+            | Disj(p,q)         -> match (inner p, inner q) with
+                                    | (_,Conj(_,_)) | (Conj(_,_),_) as z -> inner(Disj z)
+                                    | _                                  -> Disj(p,q)
+            | Conj(p,q)         -> Conj(inner p, inner q)
+            | prop              -> prop
+        nnf >> inner
+
+    (* TODO: create tautology : prop -> bool *)
+    let tautology =
+            let rec inner1 atoms = function
+                | Atom name      -> match Map.tryFind name atoms with
+                                | None         -> (false, Map.add name false atoms)
+                                | Some negated -> (negated, atoms)
+                | Neg(Atom name) -> match Map.tryFind name atoms with
+                                | None         -> (false, Map.add name true atoms)
+                                | Some negated -> (not negated, atoms)
+                | Disj(p,q)      -> let (isTaut, atoms2) = inner1 atoms p
+                                    if isTaut then (isTaut, Map.empty)
+                                    else inner1 atoms2 q    
+            let rec inner2 = function
+                | Conj(p,q) -> inner2 p && inner2 q
+                | f         -> fst (inner1 Map.empty f)
+            cnf >> inner2
+
+    (* TODO: create postfipProp : prop -> string *)
+    (* Use the following string encodings 
+     * atoms   - simply the string used for the atom )
+     * not p   - p !
+     * p and q - p q /\
+     * p or q  - p q \/ 
+     *)
+    //let postfixProp _ = failwith "Not implemented"
+    let rec postfixProp = function
+       |Atom x    -> x
+       |Neg x     -> System.String.Format(@"{0} {1}", postfixProp x,"!")
+       |Conj(p,q) -> System.String.Format(@"{0} {1} /\",postfixProp p,postfixProp q)
+       |Disj(p,q) -> System.String.Format(@"{0} {1} \/",postfixProp p,postfixProp q)
+
+    (* TODO: create simplify : prop -> option prop *)
+    let simplify _ = true      
