@@ -5,7 +5,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Library.fs"/>
+        <Compile Include="Dictionary.fs" />
+        <Compile Include="Dictionary.fsi" />
+        <Compile Include="MultiSet.fs" />
+        <Compile Include="MultiSet.fsi" />
     </ItemGroup>
 
 </Project>
