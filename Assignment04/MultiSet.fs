@@ -55,9 +55,9 @@ module Assignment04.MultiSet
         |> Map.toList
         |> List.collect (fun (key, value) -> List.replicate (int value) key)
 
-    let union (M a : MultiSet<'a>) (M b : MultiSet<'a>) = fold (fun state key value -> add key value (M state)) (M a) (M b)
+    let union (M a : MultiSet<'a>) (M b : MultiSet<'a>) = fold (fun state key value -> add key value (M state)) a (M b)
 
-    let subtract (M a : MultiSet<'a>) (M b : MultiSet<'a>) = fold (fun state key value -> remove key value (M state)) (M a) (M b)
+    let subtract (M a : MultiSet<'a>) (M b : MultiSet<'a>) = fold (fun state key value -> remove key value (M state)) a (M b)
 
     let intersection (M a : MultiSet<'a>) (M b : MultiSet<'a>) =
         fold (
