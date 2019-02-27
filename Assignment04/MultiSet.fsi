@@ -1,7 +1,6 @@
-module Assignment04.MultiSet
-
+module MultiSet
+    [<Sealed>]
     type MultiSet<'a> when 'a : comparison
-    
     val empty : MultiSet<'a>
     val isEmpty : MultiSet<'a> -> bool
     val size : MultiSet<'a> -> uint32
