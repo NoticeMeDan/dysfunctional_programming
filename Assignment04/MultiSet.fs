@@ -9,13 +9,18 @@ module MultiSet
 
     let empty :MultiSet<'a> = M Map.empty
 
-    let isEmpty (M set : MultiSet<'a>) = Map.isEmpty set
+    let isEmpty (M set : MultiSet<'a>) = set.IsEmpty
 
     let size (M set : MultiSet<'a>) = Map.fold (fun state key value -> state + value) 0u set
 
     let contains key (M set : MultiSet<'a>) = set.ContainsKey key
 
-    let numItems key (M set : MultiSet<'a>) = Map.find key set
+    let numItems key (M set : MultiSet<'a>) =
+        let option = Map.tryFind key set
+        if option = None then
+            0u
+        else
+            option.Value
 
     let add key num (M set : MultiSet<'a>) =
         if contains key (M set) then
@@ -29,7 +34,7 @@ module MultiSet
     let remove key num (M set : MultiSet<'a>) =
         if contains key (M set) then
             let prevNum = numItems key (M set)
-            if num > prevNum then
+            if num >= prevNum then
                 M(Map.remove key set)
             else
                 M(Map.add key (prevNum - num) set)
