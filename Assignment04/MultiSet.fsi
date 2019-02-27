@@ -19,4 +19,3 @@ module Assignment04.MultiSet
     val union : MultiSet<'a> -> MultiSet<'a> -> MultiSet<'a>
     val subtract : MultiSet<'a> -> MultiSet<'a> -> MultiSet<'a>
     val intersection : MultiSet<'a> -> MultiSet<'a> -> MultiSet<'a>
-    val ToString : string
