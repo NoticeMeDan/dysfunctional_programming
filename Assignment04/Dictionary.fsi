@@ -1,8 +1,6 @@
-module Assignment04.Dictionary
+module Dictionary 
 
-    type Dictionary =
-      | Leaf of Dictionary list
-      | Node of char * Dictionary list * bool
+    type Dictionary
     
     val empty : string -> Dictionary
     val insert : string -> (Dictionary -> Dictionary)
