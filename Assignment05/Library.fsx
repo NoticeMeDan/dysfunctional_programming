@@ -47,17 +47,15 @@ let factC x =
 
     aux x (fun () -> 1)
 
-(*
-    factA 16
-    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
-    val it : int = 2004189184
-
-    factC 16
-    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
-    val it : int = 2004189184
-
-    According to my machine, there is no difference between using an Accumulator and a Continuation.
-*)
+//    factA 16
+//    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
+//    val it : int = 2004189184
+//
+//    factC 16
+//    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
+//    val it : int = 2004189184
+//
+//    According to my machine, there is no difference between using an Accumulator and a Continuation.
 
 // 5.5
 let fibW x =
@@ -87,16 +85,28 @@ let fibC =
                    ) (x - 2)
     aux id
 
-(*
-    fibW 40
-    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
-    val it : int = 102334155
+
+//    fibW 40
+//    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
+//    val it : int = 102334155
+//    
+//    fibA 40
+//    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
+//    val it : int = 102334155
+//    
+//    fibC 40
+//    Real: 00:00:05.448, CPU: 00:00:05.476, GC gen0: 2561, gen1: 0
+//    val it : int = 102334155
+
+// 5.8
+let getOdd n = 2*n-1
+let odds = Seq.initInfinite (fun i -> getOdd i)
+
+// 5.9
+let rec factorial n =
+    match n with
+    | 0 | 1 -> 1
+    | _ -> n * factorial(n-1)
     
-    fibA 40
-    Real: 00:00:00.000, CPU: 00:00:00.000, GC gen0: 0, gen1: 0
-    val it : int = 102334155
+let facts = Seq.initInfinite (fun i -> factorial i)
     
-    fibC 40
-    Real: 00:00:05.448, CPU: 00:00:05.476, GC gen0: 2561, gen1: 0
-    val it : int = 102334155
-*)
