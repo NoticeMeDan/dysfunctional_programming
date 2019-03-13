@@ -108,6 +108,54 @@ let rec bigListK c =
     function
     | 0 -> c []
     | n -> bigListK (fun res -> c(1::res)) (n - 1)
+    
+// 5.7
+type 'a BinTree =
+    | Leaf
+    | Node of 'a * 'a BinTree * 'a BinTree
+
+let emptyTree = Leaf
+
+
+(* balancedTree x: creates a balanced tree with 2^x elements *)
+let balancedTree x =
+    let rec aux offset =
+        function
+        | 1 -> Leaf
+        | x -> 
+            let v = x / 2
+            Node (offset + v, aux offset v, aux (offset + v) v)
+
+    aux 0 (2.0 ** float x  |> int)
+
+let insert x =
+    let rec aux c =
+        function
+        | Leaf                      -> c (Node (x, Leaf, Leaf))
+        | Node (y, l, r) when x < y -> aux (fun t -> c (Node (y, t, r))) l 
+        | Node (y, l, r)            -> aux (fun t -> c (Node (y, l, t))) r 
+
+    aux id
+
+(* unbalancedRight x : creates a binary tree containing x elements that is 
+    unbalanced to the right *)
+let unbalancedRight = 
+    let rec aux acc =
+        function
+        | 0 -> acc
+        | x -> aux (Node (x, Leaf, acc)) (x - 1)
+
+    aux Leaf
+
+(* unbalancedLeft x : creates a binary tree containing x elements that is 
+    unbalanced to the left *)
+let unbalancedLeft x =
+    let rec aux acc =
+        function
+        | y when y > x -> acc
+        | y            -> aux (Node (y, acc, Leaf)) (y + 1)
+
+    aux Leaf 1
 
 // 5.8
 let getOdd n = 2*n-1
