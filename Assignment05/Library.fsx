@@ -98,6 +98,17 @@ let fibC =
 //    Real: 00:00:05.448, CPU: 00:00:05.476, GC gen0: 2561, gen1: 0
 //    val it : int = 102334155
 
+// 5.6
+// The function bigListK is not tail recursive
+// the reason being (fun res -> 1 :: c res) (which will also just return a list of 1's)
+// there is additional work after the recursive call.
+// A solution to this would be (fun res -> c(1::res)
+// now c is the last function called with no additional work afterwards
+let rec bigListK c =
+    function
+    | 0 -> c []
+    | n -> bigListK (fun res -> c(1::res)) (n - 1)
+
 // 5.8
 let getOdd n = 2*n-1
 let odds = Seq.initInfinite (fun i -> getOdd i)
