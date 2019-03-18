@@ -146,7 +146,28 @@ module E2 =
             
     // 6.4
     (*
+        1: ret a >>= f = f a
         
+        ret a will become Success a.
+        The bind operation will then match with Success, returning "f x s1".
+        In our case, x is a.
+        However, because we only partially applied the bind function, we can leave out the s1.
+        Therefore, ret a >>= f = f a
+        
+        2: m >>= ret = m
+        
+        This has two scenarios:
+            m s returns a Success:
+                m >>= ret = m
+                ret m s = m
+                Success m = m
+                Success m = Success m
+            
+            m s returns a Failure:
+                f m s = m
+                Failure m = m
+                Failure m = Failure m
+               
     *)
         
     // 6.5
