@@ -9,7 +9,6 @@
         <Compile Include="MultiSet.fsi" />
         <Compile Include="Dictionary.fs" />
         <Compile Include="MultiSet.fs" />
-        <Compile Include="Library.fs" />
     </ItemGroup>
 
 </Project>
