@@ -10,13 +10,6 @@
         <Compile Include="Dictionary.fs" />
         <Compile Include="MultiSet.fsi" />
         <Compile Include="MultiSet.fs" />
-        <Compile Include="ScrabbleTypes.fs" />
-        <Compile Include="GameState.fs" />
-        <Compile Include="BoardParse.fs" />
-        <Compile Include="MoveGen.fs" />
-        <Compile Include="CalculatePoints.fs" />
-        <Compile Include="ScrabbleAI.fsi" />
-        <Compile Include="ScrabbleAI.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
@@ -24,14 +17,6 @@
         <PackageReference Include="FSharp.Quotations.Evaluator" Version="1.1.3" />
         <PackageReference Include="FsPickler" Version="5.2.0" />
         <PackageReference Include="FsPickler.Json" Version="5.2.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Content Include="solutionScore.pdf" />
-        <Content Include="subproblem.pdf" />
-        <Folder Include="bin" />
-        <Content Include="EnglishDictionary.txt" />
-        <Content Include="README.md" />
     </ItemGroup>
 
     <ItemGroup>

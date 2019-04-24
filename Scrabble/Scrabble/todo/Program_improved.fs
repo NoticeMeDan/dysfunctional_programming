@@ -1,8 +1,8 @@
-module Scrabble.Program
-
-open System.IO
-open ScrabbleServer
+﻿open ScrabbleServer
 open ScrabbleUtil.ServerCommunication
+open ScrabbleUtil
+
+/// uint32: pieceId
 
 module RegEx =
     open System.Text.RegularExpressions
@@ -24,7 +24,7 @@ module RegEx =
                 | _ -> failwith "Failed (should never happen)") |>
         Seq.toList
 
- module Print =
+module Print =
 
     let printHand pieces hand =
         hand |>
@@ -47,64 +47,58 @@ module RegEx =
                 | _, None -> printf "# "
             printf "\n"
 
-module State = 
-    open ScrabbleUtil
-
-    type state = {
-        lettersPlaced : Map<ScrabbleUtil.coord, char * int>
-        hand          : MultiSet.MultiSet<uint32>
-    }
-
-    let mkState lp h = { lettersPlaced = lp; hand = h }
-
-    let newState hand = mkState Map.empty hand
-
-    let lettersPlaced st = st.lettersPlaced
-    let hand st          = st.hand
-
-let recv play st msg =
+let recv play (st:state) msg =
     match msg with
-    | RCM (CMPlaySuccess(ms, points, newPieces)) ->
-        (* Successful play by you. Update your state *)
-        let st' = st // This state needs to be updated
+    | RCM (CMPlaySuccess(moves, points, newPieces)) ->
+        printfn "Points scored: %d" points;
+        printfn "New pieces: %A" newPieces
+        
+        let st' = st |> (addPlacedPiecesToBoard moves
+                        >> removePiecesFromHand moves
+                        >> addPiecesToHand newPieces)
         play st'
     | RCM (CMPlayed (pid, ms, points)) ->
         (* Successful play by other player. Update your state *)
-        let st' = st // This state needs to be updated
+        printfn "Player %d scored %d points" pid points
+        let st' = st |> (addPlacedPiecesToBoard ms)
         play st'
     | RCM (CMPlayFailed (pid, ms)) ->
         (* Failed play. Update your state *)
+        printfn "Failed play: %A" ms
         let st' = st // This state needs to be updated
         play st'
     | RCM (CMGameOver _) -> ()
     | RCM a -> failwith (sprintf "not implmented: %A" a)
     | RErr err -> printfn "Server Error:\n%A" err; play st
     | RGPE err -> printfn "Gameplay Error:\n%A" err; play st
-
+    
 let playGame send board pieces st =
 
     let rec aux st =
-        Print.printBoard board 8 (State.lettersPlaced st)
+        Print.printBoard board 8 (lettersPlaced st)
         printfn "\n\n"
-        Print.printHand pieces (State.hand st)
+        Print.printHand pieces (hand st)
 
-        printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
+        printfn "Type 'ai' or \nInput move (format '(<x-coord> <y-coord> <piece-key><character><point-value> )*')"
         let input =  System.Console.ReadLine()
-        let move = RegEx.parseMove input
+        
+        let move =
+            match input with
+            | "ai" -> ScrabbleAI.decideMove board pieces st
+            | s -> RegEx.parseMove s
 
+//        printfn "Your calculated points: %d" calculatePoints 
         send (recv aux st) (SMPlay move)
 
     aux st
-
-
 
 let startGame send (msg : Response) = 
     match msg with
     | RCM (CMGameStarted (board, pieces, playerNumber, hand, playerList)) ->
         let hand' = List.fold (fun acc (v, x) -> MultiSet.add v x acc) MultiSet.empty hand
-        playGame send board pieces (State.newState hand')
+        playGame send board pieces (newState hand' pieces)
     | _ -> failwith "No game has been started yet"
-     
+    
 [<EntryPoint>]
 let main argv =
     let send = Comm.connect ()
