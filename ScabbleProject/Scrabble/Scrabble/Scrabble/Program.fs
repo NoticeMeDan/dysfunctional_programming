@@ -63,15 +63,24 @@ module State =
 let recv play st msg =
     match msg with
     | RCM (CMPlaySuccess(ms, points, newPieces)) ->
+        printfn "Successful play. Points earned: %d" points;
+        printfn "Piece: %A, added to your hand" newPieces;
+        // TODO: update state with:
+        // Add piece to board.
+        // Remove piece from hand.
+        // Add new piece to hand.
         (* Successful play by you. Update your state *)
         let st' = st // This state needs to be updated
         play st'
     | RCM (CMPlayed (pid, ms, points)) ->
         (* Successful play by other player. Update your state *)
+        printfn "Player: %d, played %A and got %d points" pid ms points;
+        // TODO: update state with new pieces on the board
         let st' = st // This state needs to be updated
         play st'
     | RCM (CMPlayFailed (pid, ms)) ->
         (* Failed play. Update your state *)
+        printfn "Failed to play: %A" ms
         let st' = st // This state needs to be updated
         play st'
     | RCM (CMGameOver _) -> ()
@@ -88,6 +97,7 @@ let playGame send board pieces st =
 
         printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
         let input =  System.Console.ReadLine()
+        // TODO: find a possible move
         let move = RegEx.parseMove input
 
         send (recv aux st) (SMPlay move)
