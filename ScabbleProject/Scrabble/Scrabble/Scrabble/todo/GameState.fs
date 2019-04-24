@@ -6,8 +6,8 @@ module GameState =
     
     let newState hand = mkState Map.empty hand
     
-    let lettersPlaced st = st.lettersPlaced
-    let hand st          = st.hand
+    let lettersPlaced st                 = st.lettersPlaced
+    let hand st                          = st.hand
     let overwriteHand (st:state) newHand = mkState st.lettersPlaced newHand st.piecesStore
     
     let overwriteLettersPlaced (st:state) newLettersPlace = mkState newLettersPlace st.hand st.piecesStore

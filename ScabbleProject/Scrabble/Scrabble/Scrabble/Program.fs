@@ -51,13 +51,33 @@ module State =
         pieces        : Map<uint32, piece>
     }
 
-    let mkState lp h pieces = { lettersPlaced = lp; hand = h; pieces = pieces }
+    let makeState lp h pieces = { lettersPlaced = lp; hand = h; pieces = pieces }
 
-    let newState hand = mkState Map.empty hand
+    let newState hand = makeState Map.empty hand
 
-    let lettersPlaced st = st.lettersPlaced
-    let hand st          = st.hand
-
+    let lettersPlaced state = state.lettersPlaced
+    let hand state          = state.hand
+    
+    // Overwrite playerhand with new state hand
+    let overwriteHand state newHand = makeState state.lettersPlaced newHand state.pieces
+    
+    let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
+    
+    /// Add placed pieces to the local board state and return the updated state
+    let addPlacedPiecesToBoard (pcs:piece list) (st:state) =
+        let lettersPlaced' = List.fold (fun lettersPlaced (coord, (_, piece)) -> Map.add coord piece lettersPlaced) st.lettersPlaced pcs
+        overwriteLettersPlaced st lettersPlaced'
+    
+    /// Add pieces to hand and return the updated state
+    let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
+        let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
+        overwriteHand st hand'
+        
+    /// Remove pieces from hand, given a list of moves played, and return the updated state
+    let removePiecesFromHand (usedPiecesList:piece list) st =
+        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
+        overwriteHand st hand'
+    
 let recv play st msg =
     match msg with
     | RCM (CMPlaySuccess(ms, points, newPieces)) ->
