@@ -12,7 +12,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Assignment05", "Assignment0
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Assignment06", "Assignment06\Assignment06.fsproj", "{96A97958-34D8-4EE1-A8D9-9F473B862062}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Scrabble", "Scrabble\Scrabble.fsproj", "{F9DBB2EF-613F-4637-879E-05BBD17D0CF3}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Assignment07", "Assignment07\Assignment07.fsproj", "{31767639-C3A0-4F97-B8D7-8951EE9A7C07}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,9 +44,9 @@ Global
 		{96A97958-34D8-4EE1-A8D9-9F473B862062}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{96A97958-34D8-4EE1-A8D9-9F473B862062}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{96A97958-34D8-4EE1-A8D9-9F473B862062}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F9DBB2EF-613F-4637-879E-05BBD17D0CF3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F9DBB2EF-613F-4637-879E-05BBD17D0CF3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F9DBB2EF-613F-4637-879E-05BBD17D0CF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F9DBB2EF-613F-4637-879E-05BBD17D0CF3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31767639-C3A0-4F97-B8D7-8951EE9A7C07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31767639-C3A0-4F97-B8D7-8951EE9A7C07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31767639-C3A0-4F97-B8D7-8951EE9A7C07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31767639-C3A0-4F97-B8D7-8951EE9A7C07}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
