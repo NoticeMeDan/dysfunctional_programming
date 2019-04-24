@@ -74,9 +74,9 @@ module State =
         overwriteHand st hand'
         
     /// Remove pieces from hand, given a list of moves played, and return the updated state
-    let removePiecesFromHand (usedPiecesList:piece list) st =
-        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
-        overwriteHand st hand'
+    //     let removePiecesFromHand (usedPiecesList:piece list) st =
+    //     let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
+    //     overwriteHand st hand'
     
 let recv play st msg =
     match msg with
