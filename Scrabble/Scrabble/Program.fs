@@ -1,7 +1,5 @@
-module Scrabble.Program
-
-open System.IO
 open ScrabbleServer
+open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 
 module RegEx =
@@ -95,8 +93,6 @@ let playGame send board pieces st =
         send (recv aux st) (SMPlay move)
 
     aux st
-
-
 
 let startGame send (msg : Response) = 
     match msg with
