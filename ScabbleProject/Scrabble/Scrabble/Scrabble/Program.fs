@@ -23,7 +23,6 @@ module RegEx =
         Seq.toList
 
  module Print =
-
     let printHand pieces hand =
         hand |>
         MultiSet.fold (fun _ x i -> printfn "%d -> (%A, %d)" x (Map.find x pieces) i) ()
@@ -46,14 +45,13 @@ module RegEx =
             printf "\n"
 
 module State = 
-    open ScrabbleUtil
-
     type state = {
         lettersPlaced : Map<ScrabbleUtil.coord, char * int>
         hand          : MultiSet.MultiSet<uint32>
+        pieces        : Map<uint32, piece>
     }
 
-    let mkState lp h = { lettersPlaced = lp; hand = h }
+    let mkState lp h pieces = { lettersPlaced = lp; hand = h; pieces = pieces }
 
     let newState hand = mkState Map.empty hand
 
@@ -108,7 +106,7 @@ let startGame send (msg : Response) =
     match msg with
     | RCM (CMGameStarted (board, pieces, playerNumber, hand, playerList)) ->
         let hand' = List.fold (fun acc (v, x) -> MultiSet.add v x acc) MultiSet.empty hand
-        playGame send board pieces (State.newState hand')
+        playGame send board pieces (State.newState hand' pieces)
     | _ -> failwith "No game has been started yet"
      
 [<EntryPoint>]
