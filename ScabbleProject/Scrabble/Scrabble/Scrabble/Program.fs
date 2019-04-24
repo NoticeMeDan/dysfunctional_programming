@@ -74,13 +74,13 @@ module State =
         overwriteHand st hand'
         
     /// Remove pieces from hand, given a list of moves played, and return the updated state
-    //     let removePiecesFromHand (usedPiecesList:piece list) st =
-    //     let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
-    //     overwriteHand st hand'
+    let removePiecesFromHand (usedPiecesList:piece list) st =
+        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
+        overwriteHand st hand'
     
 let recv play st msg =
     match msg with
-    | RCM (CMPlaySuccess(ms, points, newPieces)) ->
+    | RCM (CMPlaySuccess(moves, points, newPieces)) ->
         printfn "Successful play. Points earned: %d" points;
         printfn "Piece: %A, added to your hand" newPieces;
         // TODO: update state with:
@@ -88,7 +88,9 @@ let recv play st msg =
         // Remove piece from hand.
         // Add new piece to hand.
         (* Successful play by you. Update your state *)
-        let st' = st // This state needs to be updated
+        let st' = st |> (State.addPlacedPiecesToBoard moves
+                        >> State.removePiecesFromHand moves
+                        >> State.addPiecesToHand newPieces)
         play st'
     | RCM (CMPlayed (pid, ms, points)) ->
         (* Successful play by other player. Update your state *)
@@ -113,11 +115,14 @@ let playGame send board pieces st =
         printfn "\n\n"
         Print.printHand pieces (State.hand st)
 
-        printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
+        printfn "Type 'ai' or \nInput move (format '(<x-coord> <y-coord> <piece-key><character><point-value> )*')"
         let input =  System.Console.ReadLine()
-        // TODO: find a possible move
-        let move = RegEx.parseMove input
+        
+        let move =
+            match input with
+            | s -> RegEx.parseMove s
 
+//        printfn "Your calculated points: %d" calculatePoints 
         send (recv aux st) (SMPlay move)
 
     aux st
