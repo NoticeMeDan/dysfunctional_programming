@@ -1,6 +1,10 @@
+open System.IO
+
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
+
+open System.Net.Sockets
 
 module RegEx =
     open System.Text.RegularExpressions
@@ -64,8 +68,9 @@ module State =
     let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
     
     /// Add placed pieces to the local board state and return the updated state
-    let addPlacedPiecesToBoard (pcs:piece list) (st:state) =
-        let lettersPlaced' = List.fold (fun lettersPlaced (coord, (_, piece)) -> Map.add coord piece lettersPlaced) st.lettersPlaced pcs
+    let addPlacedPiecesToBoard (pcs:(coord * (uint32 * (char * int))) list) (st:state) =
+        let lettersPlaced' =
+            List.fold (fun lettersPlaced (coord, (_, piece)) -> Map.add coord piece lettersPlaced) st.lettersPlaced pcs
         overwriteLettersPlaced st lettersPlaced'
     
     /// Add pieces to hand and return the updated state
@@ -74,68 +79,102 @@ module State =
         overwriteHand st hand'
         
     /// Remove pieces from hand, given a list of moves played, and return the updated state
-    let removePiecesFromHand (usedPiecesList:piece list) st =
+    let removePiecesFromHand (usedPiecesList:(coord * (uint32 * (char * int))) list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
-    
-let recv play st msg =
-    match msg with
-    | RCM (CMPlaySuccess(moves, points, newPieces)) ->
-        printfn "Successful play. Points earned: %d" points;
-        printfn "Piece: %A, added to your hand" newPieces;
-        // TODO: update state with:
-        // Add piece to board.
-        // Remove piece from hand.
-        // Add new piece to hand.
-        (* Successful play by you. Update your state *)
-        let st' = st |> (State.addPlacedPiecesToBoard moves
-                        >> State.removePiecesFromHand moves
-                        >> State.addPiecesToHand newPieces)
-        play st'
-    | RCM (CMPlayed (pid, ms, points)) ->
-        (* Successful play by other player. Update your state *)
-        printfn "Player: %d, played %A and got %d points" pid ms points;
-        // TODO: update state with new pieces on the board
-        let st' = st // This state needs to be updated
-        play st'
-    | RCM (CMPlayFailed (pid, ms)) ->
-        (* Failed play. Update your state *)
-        printfn "Failed to play: %A" ms
-        let st' = st // This state needs to be updated
-        play st'
-    | RCM (CMGameOver _) -> ()
-    | RCM a -> failwith (sprintf "not implmented: %A" a)
-    | RErr err -> printfn "Server Error:\n%A" err; play st
-    | RGPE err -> printfn "Gameplay Error:\n%A" err; play st
 
-let playGame send board pieces st =
+let playGame cstream board pieces (st : State.state) =
 
-    let rec aux st =
+    let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
         printfn "\n\n"
         Print.printHand pieces (State.hand st)
 
-        printfn "Type 'ai' or \nInput move (format '(<x-coord> <y-coord> <piece-key><character><point-value> )*')"
+        printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
         let input =  System.Console.ReadLine()
-        
-        let move =
-            match input with
-            | s -> RegEx.parseMove s
+        let move = RegEx.parseMove input
 
-//        printfn "Your calculated points: %d" calculatePoints 
-        send (recv aux st) (SMPlay move)
+        printfn "Trying to play: %A" move
+        send cstream (SMPlay move)
+        let msg = recv cstream
+        match msg with
+        | RCM (CMPlaySuccess(ms, points, newPieces)) ->
+            (* Successful play by you. Update your state *)
+            printfn "Success!!!\n%A\n%A\n%A" ms points newPieces
+            let st' = st // This state needs to be updated
+            aux st'
+        | RCM (CMPlayed (pid, ms, points)) ->
+            (* Successful play by other player. Update your state *)
+            let st' = st // This state needs to be updated
+            aux st'
+        | RCM (CMPlayFailed (pid, ms)) ->
+            (* Failed play. Update your state *)
+            let st' = st // This state needs to be updated
+            aux st'
+        | RCM (CMGameOver _) -> ()
+        | RCM a -> failwith (sprintf "not implmented: %A" a)
+        | RErr err -> printfn "Server Error:\n%A" err; aux st
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
+
 
     aux st
 
-let startGame send (msg : Response) = 
-    match msg with
-    | RCM (CMGameStarted (board, pieces, playerNumber, hand, playerList)) ->
-        let hand' = List.fold (fun acc (v, x) -> MultiSet.add v x acc) MultiSet.empty hand
-        playGame send board pieces (State.newState hand' pieces)
-    | _ -> failwith "No game has been started yet"
-     
+let setupGame cstream board alphabet words handSize timeout =
+    let rec aux () =
+        match ServerCommunication.recv cstream with
+        | RCM (CMPlayerJoined name) ->
+            printfn "Player %s joined" name
+            aux ()
+        | RCM (CMGameStarted (playerNumber, hand, firstPlayer, pieces, players)) as msg ->
+            printfn "Game started %A" msg
+            let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
+            playGame cstream board pieces (State.newState handSet pieces)
+        | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
+        
+    aux ()
+
+let joinGame port gameId password playerName =
+    async {
+        let client = new TcpClient(sprintf "%A" (localIP ()), port)
+        use cstream = client.GetStream()
+        send cstream (SMJoinGame (gameId, password, playerName))
+
+        match ServerCommunication.recv cstream with
+            | RCM (CMJoinSuccess(board, numberOfPlayers, alphabet, words, handSize, timeout)) -> 
+                setupGame cstream board alphabet words handSize timeout 
+            | msg -> failwith (sprintf "Error joining game%A" msg)
+
+    }
+
+let startGame port numberOfPlayers = 
+    async {
+        let client = new TcpClient(sprintf "%A" (localIP ()), port)
+        let cstream = client.GetStream()
+        let path = "../../../EnglishDictionary.txt"
+        let words = File.ReadLines path |> Seq.toList
+        let board = StandardBoard.mkStandardBoard ()
+        let pieces = English.pieces()
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        let handSize = 7u
+        let timeout = None
+        let seed = None
+
+        send cstream (SMStartGame (numberOfPlayers, "My game", "password", "My name", seed, board, pieces,
+                                    handSize, alphabet, words, timeout))
+
+        let gameId =
+            match ServerCommunication.recv cstream with
+            | RCM (CMGameInit gameId) -> gameId
+            | msg -> failwith (sprintf "Error initialising game, server sent other message than CMGameInit (should not happen)\n%A" msg)
+            
+        do! (async { setupGame cstream board alphabet words handSize timeout } ::
+             [for i in 2u..numberOfPlayers do yield joinGame port gameId "password" ("Player" + (string i))] |>
+             Async.Parallel |> Async.Ignore)
+    }
+
 [<EntryPoint>]
 let main argv =
-    let send = Comm.connect ()
-    send (startGame send) (SMStartGame(1u, "My game", "", "My name"))
+    [Comm.startServer 13000; startGame 13000 1u] |>
+    Async.Parallel |>
+    Async.RunSynchronously |> ignore
     0 // return an integer exit code
