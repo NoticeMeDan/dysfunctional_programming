@@ -55,7 +55,7 @@ module State =
         pieces        : Map<uint32, piece>
     }
 
-    let makeState lp h pieces = { lettersPlaced = lp; hand = h; pieces = pieces }
+    let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
 
     let newState hand = makeState Map.empty hand
 
@@ -70,7 +70,8 @@ module State =
     /// Add placed pieces to the local board state and return the updated state
     let addPlacedPiecesToBoard (pcs:(coord * (uint32 * (char * int))) list) (st:state) =
         let lettersPlaced' =
-            List.fold (fun lettersPlaced (coord, (_, piece)) -> Map.add coord piece lettersPlaced) st.lettersPlaced pcs
+            List.fold (fun lettersPlaced (coord, (_, piece)) ->
+                Map.add coord piece lettersPlaced) st.lettersPlaced pcs
         overwriteLettersPlaced st lettersPlaced'
     
     /// Add pieces to hand and return the updated state
@@ -84,7 +85,6 @@ module State =
         overwriteHand st hand'
 
 let playGame cstream board pieces (st : State.state) =
-
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
         printfn "\n\n"
@@ -98,10 +98,15 @@ let playGame cstream board pieces (st : State.state) =
         send cstream (SMPlay move)
         let msg = recv cstream
         match msg with
-        | RCM (CMPlaySuccess(ms, points, newPieces)) ->
+        | RCM (CMPlaySuccess(moves, points, newPieces)) ->
             (* Successful play by you. Update your state *)
-            printfn "Success!!!\n%A\n%A\n%A" ms points newPieces
-            let st' = st // This state needs to be updated
+            printfn "Success. You moved: %A" moves
+            printfn "points: %A" points
+            printfn "new pieces %A" newPieces
+            
+            let st' = st |> (State.addPlacedPiecesToBoard moves
+                         >> State.removePiecesFromHand moves
+                         >> State.addPiecesToHand newPieces) 
             aux st'
         | RCM (CMPlayed (pid, ms, points)) ->
             (* Successful play by other player. Update your state *)
