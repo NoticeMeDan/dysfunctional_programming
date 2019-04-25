@@ -54,6 +54,14 @@ module State =
         hand          : MultiSet.MultiSet<uint32>
         pieces        : Map<uint32, piece>
     }
+    
+    type piecePlaced = (coord * (uint32 * (char * int)))
+    
+    type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
+    let singleLetterScore : tile = ('a', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 10) Map.empty)
+    let doubleLetterScore : tile = ('c', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 2) Map.empty)
+    let trippleLetterScore : tile = ('b', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 3) Map.empty)
+    
 
     let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
 
@@ -68,7 +76,7 @@ module State =
     let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
     
     /// Add placed pieces to the local board state and return the updated state
-    let addPlacedPiecesToBoard (pcs:(coord * (uint32 * (char * int))) list) (st:state) =
+    let addPlacedPiecesToBoard (pcs:piecePlaced list) (st:state) =
         let lettersPlaced' =
             List.fold (fun lettersPlaced (coord, (_, piece)) ->
                 Map.add coord piece lettersPlaced) st.lettersPlaced pcs
@@ -80,7 +88,7 @@ module State =
         overwriteHand st hand'
         
     /// Remove pieces from hand, given a list of moves played, and return the updated state
-    let removePiecesFromHand (usedPiecesList:(coord * (uint32 * (char * int))) list) st =
+    let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
 
