@@ -116,9 +116,10 @@ let playGame cstream board pieces (st : State.state) =
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
             aux st'
-        | RCM (CMPlayed (pid, ms, points)) ->
+        | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
-            let st' = st // This state needs to be updated
+            printfn "Player %A, played:\n %A" pid moves
+            let st' = st |> State.addPlacedPiecesToBoard moves
             aux st'
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
@@ -128,7 +129,6 @@ let playGame cstream board pieces (st : State.state) =
         | RCM a -> failwith (sprintf "not implmented: %A" a)
         | RErr err -> printfn "Server Error:\n%A" err; aux st
         | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
-
 
     aux st
 
@@ -156,7 +156,6 @@ let joinGame port gameId password playerName =
             | RCM (CMJoinSuccess(board, numberOfPlayers, alphabet, words, handSize, timeout)) -> 
                 setupGame cstream board alphabet words handSize timeout 
             | msg -> failwith (sprintf "Error joining game%A" msg)
-
     }
 
 let startGame port numberOfPlayers = 
