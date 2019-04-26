@@ -190,13 +190,6 @@ let joinGame port gameId password playerName =
             | msg -> failwith (sprintf "Error joining game%A" msg)
     }
 
-(*let createDictionary filePath =
-    let englishAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    let readLines filePath = System.IO.File.ReadLines filePath
-    let ed = Dictionary.empty englishAlphabet
-    
-    Seq.foldBack Dictionary.insert (readLines filePath) ed*)
-
 let startGame port numberOfPlayers = 
     async {
         let client = new TcpClient(sprintf "%A" (localIP ()), port)
