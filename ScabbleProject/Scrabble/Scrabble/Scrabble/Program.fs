@@ -93,19 +93,22 @@ module State =
         overwriteHand st hand'
 
 module Computer =
-    let calculateMove board pieces state = 
+    let calculateNextMove board pieces state = 
     // save current word
     // Recursively:
         // choose direction
         // check if we can make a legal word on next tile
         // if we can, create move, else change direction
         []
+        
+    let calculateFirstMove board pieces state =
+        []
 
     let makeMove (board:ScrabbleUtil.board) pieces (state:State.state) coord = 
         // let dictionary = get file from path
         match Map.tryFind(board.center) state.lettersPlaced with
-            | x -> []
-            //| Some(_) -> calculateMove board pieces state
+            | None -> calculateFirstMove board pieces state
+            | Some(_) -> calculateNextMove board pieces state
 
 let playGame cstream board pieces (st : State.state) =
     let rec aux (st : State.state) =
