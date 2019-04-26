@@ -58,11 +58,11 @@ module State =
     type piecePlaced = (coord * (uint32 * (char * int)))
     
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
+    
     let singleLetterScore : tile = ('a', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 10) Map.empty)
     let doubleLetterScore : tile = ('c', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 2) Map.empty)
     let trippleLetterScore : tile = ('b', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 3) Map.empty)
     
-
     let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
 
     let newState hand = makeState Map.empty hand
@@ -92,6 +92,24 @@ module State =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
 
+module Computer =
+    let calculateNextMove board pieces state = 
+    // save current word
+    // Recursively:
+        // choose direction
+        // check if we can make a legal word on next tile
+        // if we can, create move, else change direction
+        []
+        
+    let calculateFirstMove board pieces state =
+        []
+
+    let makeMove (board:ScrabbleUtil.board) pieces (state:State.state) coord = 
+        // let dictionary = get file from path
+        match Map.tryFind(board.center) state.lettersPlaced with
+            | None -> calculateFirstMove board pieces state
+            | Some(_) -> calculateNextMove board pieces state
+
 let playGame cstream board pieces (st : State.state) =
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
@@ -100,7 +118,10 @@ let playGame cstream board pieces (st : State.state) =
 
         printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
         let input =  System.Console.ReadLine()
-        let move = RegEx.parseMove input
+        let move =
+            match input with
+            //| "" -> Computer.makeMove board pieces st 
+            | s -> RegEx.parseMove input
 
         printfn "Trying to play: %A" move
         send cstream (SMPlay move)
@@ -116,9 +137,10 @@ let playGame cstream board pieces (st : State.state) =
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
             aux st'
-        | RCM (CMPlayed (pid, ms, points)) ->
+        | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
-            let st' = st // This state needs to be updated
+            printfn "Player %A, played:\n %A" pid moves
+            let st' = st |> State.addPlacedPiecesToBoard moves
             aux st'
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
@@ -128,7 +150,6 @@ let playGame cstream board pieces (st : State.state) =
         | RCM a -> failwith (sprintf "not implmented: %A" a)
         | RErr err -> printfn "Server Error:\n%A" err; aux st
         | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
-
 
     aux st
 
@@ -156,7 +177,6 @@ let joinGame port gameId password playerName =
             | RCM (CMJoinSuccess(board, numberOfPlayers, alphabet, words, handSize, timeout)) -> 
                 setupGame cstream board alphabet words handSize timeout 
             | msg -> failwith (sprintf "Error joining game%A" msg)
-
     }
 
 let startGame port numberOfPlayers = 
@@ -184,10 +204,11 @@ let startGame port numberOfPlayers =
              [for i in 2u..numberOfPlayers do yield joinGame port gameId "password" ("Player" + (string i))] |>
              Async.Parallel |> Async.Ignore)
     }
-
+    
 [<EntryPoint>]
 let main argv =
     [Comm.startServer 13000; startGame 13000 1u] |>
     Async.Parallel |>
     Async.RunSynchronously |> ignore
     0 // return an integer exit code
+
