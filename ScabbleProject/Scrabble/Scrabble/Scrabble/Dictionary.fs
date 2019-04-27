@@ -38,5 +38,3 @@ module Dictionary
          | Node(c, list, b) -> false
        
       search characters dict
-   
-   

@@ -113,7 +113,31 @@ module Computer =
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
+    
+let rec anagramCombinations (letters:string) (sofar: string) (words:Set<string>) =
+  let anagram = Seq.toList letters
+  for i in 0 .. anagram.Length-1 do
+     let letter = anagram.Item(i)
+     if letters.IndexOf(letter, 1+i) = -1 then
+        let ls = letters.Substring(0, i) + letters.Substring(i + 1)
+        let sf = sofar + string letter
+        anagramCombinations ls sf words
 
+  if (letters = "") then printfn "%s" sofar
+  
+let anagramSolver (letters:string) =
+    let rec comb (ls:string) (wordcount:int) =
+        if wordcount > 0 then
+            anagramCombinations ls "" Set.empty
+            comb (ls.Remove(wordcount-1)) (wordcount-1)            
+    
+    let rec anagramComb (ls:string) (rotations:int) =
+        if rotations > 0 then
+            comb ls ls.Length
+            let nextLetterRotation = (ls.Remove(0,1) + ls.Chars(0).ToString())
+            anagramComb nextLetterRotation (rotations-1)
+    anagramComb letters letters.Length        
+        
 let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
     let lookup word =
@@ -220,4 +244,3 @@ let main argv =
     Async.Parallel |>
     Async.RunSynchronously |> ignore
     0 // return an integer exit code
-
