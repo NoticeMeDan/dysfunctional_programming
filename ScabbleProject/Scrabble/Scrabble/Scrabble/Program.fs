@@ -109,8 +109,16 @@ module Computer =
         match Map.tryFind(board.center) state.lettersPlaced with
             | None -> calculateFirstMove board pieces state
             | Some(_) -> calculateNextMove board pieces state
+            
+let createDictionary words =
+    let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
-let playGame cstream board pieces (st : State.state) =
+let playGame cstream board pieces (st : State.state) words =
+    let dict = createDictionary words
+    let lookup word =
+        Dictionary.lookup word dict
+        
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
         printfn "\n\n"
@@ -118,6 +126,7 @@ let playGame cstream board pieces (st : State.state) =
 
         printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
         let input =  System.Console.ReadLine()
+        printf "Word: %A -> %A\n" input (lookup input)
         let move =
             match input with
             //| "" -> Computer.makeMove board pieces st 
@@ -162,7 +171,7 @@ let setupGame cstream board alphabet words handSize timeout =
         | RCM (CMGameStarted (playerNumber, hand, firstPlayer, pieces, players)) as msg ->
             printfn "Game started %A" msg
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
-            playGame cstream board pieces (State.newState handSet pieces)
+            playGame cstream board pieces (State.newState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
         
     aux ()
