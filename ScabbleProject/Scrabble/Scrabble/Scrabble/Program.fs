@@ -112,9 +112,7 @@ module Computer =
             
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    let dict = List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
-    
-    dict
+    List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
 let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
