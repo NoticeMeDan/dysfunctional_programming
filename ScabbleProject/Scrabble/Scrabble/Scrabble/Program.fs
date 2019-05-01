@@ -120,7 +120,6 @@ module CalculatePoints =
 
         compute 0
 
-// TODO
 // List is : List<List<String>>
 let rec findAnagrams list =
     let length = List.length list
@@ -128,17 +127,19 @@ let rec findAnagrams list =
     // Word is a List<String>
     let rec combine wordList index map =
         if List.length wordList < length then
-            let nextWord = wordList @ [list.[index]]
+            // Next wordList is current wordlist, with the appended list[index]
+            let nextWordList = wordList @ [list.[index]]
             let newMap = map |> Map.add index index 
             
             [0 .. (length-1)]
-            |> List.fold (fun acc value ->
-                match Map.tryFind value newMap with
-                | None -> (combine nextWord value newMap) @ acc
+            |> List.fold (fun acc index ->
+                match Map.tryFind index newMap with
+                | None -> (combine nextWordList index newMap) @ acc
                 | Some _ -> acc
-                ) [nextWord]
+                ) [nextWordList]
         else []
-
+    
+    // Combine for every index of the given list. 
     [0 .. (length-1)] |> List.fold (fun acc index -> (combine [] index Map.empty)@acc) []
     
 // TODO
