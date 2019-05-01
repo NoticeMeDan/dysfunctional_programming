@@ -484,23 +484,23 @@ let playGame cstream board pieces (st : State.state) words =
             printfn "points: %A" points
             printfn "new pieces %A" newPieces
             
-            let st' = st |> (State.addPlacedPiecesToBoard moves
+            let st' = state |> (State.addPlacedPiecesToBoard moves
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
             aux st'
         | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
-            let st' = st |> State.addPlacedPiecesToBoard moves
+            let st' = state |> State.addPlacedPiecesToBoard moves
             aux st'
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
-            let st' = st // This state needs to be updated
+            let st' = state // This state needs to be updated
             aux st'
         | RCM (CMGameOver _) -> ()
         | RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RErr err -> printfn "Server Error:\n%A" err; aux st
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
+        | RErr err -> printfn "Server Error:\n%A" err; aux state
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux state
 
     aux st
 
