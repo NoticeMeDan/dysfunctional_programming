@@ -3,7 +3,6 @@ open System.IO
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
-
 open System.Net.Sockets
 
 module RegEx =
@@ -53,40 +52,48 @@ module RegEx =
             printf "\n"
 
 module State = 
-    open ScrabbleUtil
-
     type state = {
         lettersPlaced : Map<ScrabbleUtil.coord, char * int>
         hand          : MultiSet.MultiSet<uint32>
-        dictionary    : Dictionary.Dictionary
-        ourID         : uint32
-        playerTurn    : uint32          //todo
-        playersScores : Map<uint32, uint32> //todo
-        playersName   : Map<uint32, string> //todo
+        pieces        : Map<uint32, piece>
     }
-    let makeDictionary = 
-        let readLines filePath = System.IO.File.ReadLines filePath
-        let fromFile path = 
-            let ed = Dictionary.empty ""
-            Seq.foldBack Dictionary.insert (readLines path) ed
-        let englishDict = fromFile "../../../EnglishDictionary.txt"
-        englishDict;
+    
+    type piecePlaced = (coord * (uint32 * (char * int)))
+    
+    type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
+    
+    let singleLetterScore : tile = ('a', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 10) Map.empty)
+    let doubleLetterScore : tile = ('c', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 2) Map.empty)
+    let trippleLetterScore : tile = ('b', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 3) Map.empty)
+    
+    let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
 
-    let mkState lp h = {
-        lettersPlaced = lp; 
-        hand          = h; 
-        dictionary    = makeDictionary; 
-        ourID         = 0u; 
-        playerTurn    = 0u; 
-        playersScores = Map.empty; 
-        playersName   = Map.empty
-    }
+    let newState hand = makeState Map.empty hand
 
-    let newState hand = mkState Map.empty hand
-
-    let lettersPlaced st = st.lettersPlaced
-    let hand st          = st.hand
-
+    let lettersPlaced state = state.lettersPlaced
+    let hand state          = state.hand
+    
+    // Overwrite playerhand with new state hand
+    let overwriteHand state newHand = makeState state.lettersPlaced newHand state.pieces
+    
+    let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
+    
+    /// Add placed pieces to the local board state and return the updated state
+    let addPlacedPiecesToBoard (pcs:piecePlaced list) (st:state) =
+        let lettersPlaced' =
+            List.fold (fun lettersPlaced (coord, (_, piece)) ->
+                Map.add coord piece lettersPlaced) st.lettersPlaced pcs
+        overwriteLettersPlaced st lettersPlaced'
+    
+    /// Add pieces to hand and return the updated state
+    let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
+        let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
+        overwriteHand st hand'
+        
+    /// Remove pieces from hand, given a list of moves played, and return the updated state
+    let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
+        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
+        overwriteHand st hand'
 
 module CalculatePoints =
     let calculatePoints (tiles: tile list) (words: (char * int) array) =
@@ -105,42 +112,6 @@ module CalculatePoints =
         let compute = fl |> List.fold (>>) id
 
         compute 0
-
-let handleMessageFromServer play (st: State.state) msg =
-    match msg with
-    | RCM (CMPlaySuccess(ms, points, newPieces)) ->
-        (* Successful play by you. Update your state *)
-        let st1 = {st with lettersPlaced = 
-                                 ms
-                                 |> List.fold (fun acc (coordinate, (id, charVal)) -> acc |> Map.add coordinate charVal) st.lettersPlaced}
-        let st2 = {st1 with hand = 
-                                 ms
-                                 |> List.fold (fun acc (coordinate, (id, charVal)) -> acc |> MultiSet.remove id 1u) st1.hand } 
-        let st3 = {st2 with hand = 
-                                 newPieces
-                                 |> List.fold (fun acc (id, amount) -> acc |> MultiSet.add id amount) st2.hand } 
-        let st4 = {st3 with playersScores = st3.playersScores |> Map.add st3.ourID ((st3.playersScores |> Map.find st3.ourID) + (points |> uint32))} 
-        play st4
-    | RCM(CMPassed (playerID))  -> play st
-    | RCM(CMForfeit (playerID))  ->
-        let st1 = {st with playersScores = st.playersScores |> Map.remove playerID }
-        play st
-    | RCM (CMPlayed (pid, ms, points)) ->
-        (* Successful play by other player. Update your state *)
-        let st1 = {st with lettersPlaced = 
-                                 ms
-                                 |> List.fold (fun acc (coordinate, (id, charVal)) -> acc |> Map.add coordinate charVal) st.lettersPlaced}
-        let st2 = {st1 with playersScores = st1.playersScores |> Map.add pid ((st1.playersScores |> Map.find pid) + (points |> uint32))}         
-        play st2
-    | RCM (CMPlayFailed (pid, ms)) ->
-        (* Failed play. Update your state *)
-        let st' = st // This state needs to be updated
-        play st'
-    | RCM (CMGameOver _) -> ()
-    | RCM a -> failwith (sprintf "not implmented: %A" a)
-    | RErr err -> printfn "Server Error:\n%A" err; play st
-    | RGPE err -> printfn "Gameplay Error:\n%A" err; play st
-
     
 let rec makeCombinations (lst ) =
     let givenLenghtOflst = List.length lst
@@ -179,7 +150,6 @@ let rec sumOfWord word =
     match word with 
     | [] -> 0
     | (index, set)::xt -> (snd (set |>Set.toList).[0]) + (sumOfWord xt) 
-
 
 let createMove word startPos goX goY =
     word
@@ -269,17 +239,17 @@ let convertStringToPiece words mapCharToIndexes pieces =
                     )
     |> List.map (fun (x, map) -> x)
 
-let filterWords (st : State.state) words= 
+let filterWords (st : State.state) words dictionary = 
     words
-    |> List.filter (fun x -> Dictionary.lookup x st.dictionary)
+    |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
-let placeOnEmptyBoard center pieces (st : State.state) hand = 
+let placeOnEmptyBoard center pieces (st : State.state) hand dict = 
     let mapCharToIndexes = reversePiecesMap pieces hand
     printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand hand pieces
-    let filteredWords = words |> filterWords st
+    let filteredWords = filterWords st words dict 
     printfn "filteredWords: %A" filteredWords
     
     let describedWords =
@@ -289,12 +259,11 @@ let placeOnEmptyBoard center pieces (st : State.state) hand =
     describedWords
     |> createMoveFromListOfWords center 1 0
 
-let bestExtendingWord pieces (st : State.state) hand charLst lenght = 
+let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictionary.Dictionary)= 
     let mapCharToIndexes = reversePiecesMap pieces hand
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
     let filteredWords =
-        words
-        |> filterWords st
+        filterWords st words dict
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
     convertStringToPiece filteredWords mapCharToIndexes pieces
@@ -330,7 +299,6 @@ let emptyPlaces (x,y) placed board moveX moveY handSize =
 let emptyLeft (x,y) placed board = isTileEmpty (x-1,y) placed board
 let emptyAbove (x,y) placed board = isTileEmpty (x,y-1) placed board
 
-
 let wordAdjacentToTile (x,y) placed board moveX moveY =
     let rec innerFn (x,y) value =
         if (isTileEmpty (x,y) placed board ) then value
@@ -343,7 +311,7 @@ let wordAdjacentToTile (x,y) placed board moveX moveY =
 let theTwoWordsAdjacentToTile (x,y) placed board =
     wordAdjacentToTile (x,y) placed board -1 0, wordAdjacentToTile (x,y) placed board 0 -1
 
-let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand=
+let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // helperMethods
     let isTileEmpty (x,y) = isTileEmpty (x,y) placed board
     let charOnTile (x,y) = charOnTile (x,y) placed board
@@ -356,7 +324,6 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand=
     let maxX = fst c + radius
     let minY = snd c - radius
     let maxY = snd c + radius
-
 
     // AI
     let occupiedTileLocations = [
@@ -411,7 +378,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand=
         mapCharToBestTile
         |> Map.toList
         |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces st hand charLst (max placesX placesY)
+            let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
             let word =
                 match words with
                 | [] -> None
@@ -436,41 +403,66 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand=
         
         createMove word (x,y) distanceX distanceY
 
-let AIDecideMove board pieces (st : State.state) radius placed hand=
+let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
     match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', map) ->      
-        placeOnEmptyBoard (board.center) pieces st hand
+        placeOnEmptyBoard (board.center) pieces st hand dict
     | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand
+        PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand dict
 
+let createDictionary words =
+    let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
-
-let playGame cstream board pieces (st : State.state) =
-
+let playGame cstream board pieces (st : State.state) words =
+    let dict = createDictionary words
+    let lookup word =
+        Dictionary.lookup word dict
+        
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
         printfn "\n\n"
-        Print.printPoints st.playersScores st.playersName
-        printfn "\n\n"
         Print.printHand pieces (State.hand st)
 
-        
-        let player = "AI"
-        let play = 
-            match player with
-            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand
-            | "SKIP" -> SMPass
-            | _    ->
-                    printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
-                    let input =  System.Console.ReadLine()
-                    let move = RegEx.parseMove input
-                    SMPlay move
-        printfn "Play: %A" play
-        send cstream (play)
+        printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
+        let input =  System.Console.ReadLine()
+        printf "Word: %A -> %A\n" input (lookup input)
+        let move =
+            match input with
+            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+            | "PASS" -> SMPass
+            //| "NEW_HAND" -> SMChange
+
+        printfn "Trying to play: %A" move
+        send cstream (move)
         let msg = recv cstream
-        handleMessageFromServer aux st msg
+        match msg with
+        | RCM (CMPlaySuccess(moves, points, newPieces)) ->
+            (* Successful play by you. Update your state *)
+            printfn "Success. You moved: %A" moves
+            printfn "points: %A" points
+            printfn "new pieces %A" newPieces
+            
+            let st' = st |> (State.addPlacedPiecesToBoard moves
+                         >> State.removePiecesFromHand moves
+                         >> State.addPiecesToHand newPieces) 
+            aux st'
+        | RCM (CMPlayed (pid, moves, points)) ->
+            (* Successful play by other player. Update your state *)
+            printfn "Player %A, played:\n %A" pid moves
+            let st' = st |> State.addPlacedPiecesToBoard moves
+            aux st'
+        | RCM (CMPlayFailed (pid, ms)) ->
+            (* Failed play. Update your state *)
+            let st' = st // This state needs to be updated
+            aux st'
+        | RCM (CMGameOver _) -> ()
+        | RCM a -> failwith (sprintf "not implmented: %A" a)
+        | RErr err -> printfn "Server Error:\n%A" err; aux st
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
+
     aux st
 
 let setupGame cstream board alphabet words handSize timeout =
@@ -481,16 +473,8 @@ let setupGame cstream board alphabet words handSize timeout =
             aux ()
         | RCM (CMGameStarted (playerNumber, hand, firstPlayer, pieces, players)) as msg ->
             printfn "Game started %A" msg
-            let state = 
-                hand
-                |> List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty
-                |> State.newState
-            let state = {state with ourID = playerNumber}
-            let state = {state with playersScores = players |> List.map(fun (id, name) -> (id, 0u)) |> Map.ofList}
-            let state = {state with playersName = players |> Map.ofList}
-            let state = {state with playerTurn = firstPlayer}
-            playGame cstream board pieces state
-
+            let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
+            playGame cstream board pieces (State.newState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
         
     aux ()
@@ -505,7 +489,6 @@ let joinGame port gameId password playerName =
             | RCM (CMJoinSuccess(board, numberOfPlayers, alphabet, words, handSize, timeout)) -> 
                 setupGame cstream board alphabet words handSize timeout 
             | msg -> failwith (sprintf "Error joining game%A" msg)
-
     }
 
 let startGame port numberOfPlayers = 
@@ -521,7 +504,7 @@ let startGame port numberOfPlayers =
         let timeout = None
         let seed = None
 
-        send cstream (SMStartGame (numberOfPlayers, "My game", "password", "My player", seed, board, pieces,
+        send cstream (SMStartGame (numberOfPlayers, "My game", "password", "My name", seed, board, pieces,
                                     handSize, alphabet, words, timeout))
 
         let gameId =
