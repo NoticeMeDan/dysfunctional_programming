@@ -433,11 +433,12 @@ let playGame cstream board pieces (st : State.state) words =
         printf "Word: %A -> %A\n" input (lookup input)
         let move =
             match input with
-            //| "" -> Computer.makeMove board pieces st 
-            | s -> RegEx.parseMove input
+            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+            | "PASS" -> SMPass
+            //| "NEW_HAND" -> SMChange
 
         printfn "Trying to play: %A" move
-        send cstream (SMPlay move)
+        send cstream (move)
         let msg = recv cstream
         match msg with
         | RCM (CMPlaySuccess(moves, points, newPieces)) ->
