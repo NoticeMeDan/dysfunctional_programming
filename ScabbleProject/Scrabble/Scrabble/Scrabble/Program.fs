@@ -432,12 +432,12 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         
         createMove word (x,y) distanceX distanceY
 
-let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius hand (dict:Dictionary.Dictionary) =
+let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
     match Map.tryFind (board.center) state.lettersPlaced with
     | None ->      
-        placeOnEmptyBoard (board.center) pieces state hand dict
+        placeOnEmptyBoard (board.center) pieces state state.hand dict
     | Some _ ->                                                   
-        PlaceOnNonEmptyBoard board pieces state radius state.lettersPlaced hand dict
+        PlaceOnNonEmptyBoard board pieces state radius state.lettersPlaced state.hand dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -449,17 +449,17 @@ let playGame cstream board pieces (st : State.state) words =
     let lookup word =
         Dictionary.lookup word dict
         
-    let rec aux (st : State.state) =
-        Print.printBoard board 8 (State.lettersPlaced st)
+    let rec aux (state : State.state) =
+        Print.printBoard board 8 (State.lettersPlaced state)
         printfn "\n\n"
-        Print.printHand pieces (State.hand st)
+        Print.printHand pieces (State.hand state)
 
         printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
         let input =  System.Console.ReadLine()
         printf "Word: %A -> %A\n" input (lookup input)
         let move =
             match input with
-            | "AI" -> makeMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+            | "AI" -> makeMove board pieces state 8 dict
             | "PASS" -> SMPass
             //| "NEW_HAND" -> SMChange
 
