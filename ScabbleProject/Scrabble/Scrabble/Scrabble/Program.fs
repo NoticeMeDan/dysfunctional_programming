@@ -91,6 +91,24 @@ module State =
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
+        
+module CalculatePoints =
+    let calculatePoints (tiles: tile list) (words: (char * int) array) =
+        let pset =
+            tiles |> List.fold
+                         (fun acc tile -> Map.fold (fun mapAcc key value -> Set.add key mapAcc) acc (snd tile))
+                         Set.empty<uint32>
+
+        let get tile p pos =
+           match Map.tryFind p (snd tile) with
+           | None -> id
+           | Some f -> f pos words
+
+        let processor p = tiles |> List.fold (fun (f, i) t ->  ((get t p i) :: f, i + 1u)) ([], 0u) |> fst
+        let fl = Set.foldBack (fun ks s -> (processor ks) @ s) pset []
+        let compute = fl |> List.fold (>>) id
+
+        compute 0
 
 module Computer =
     let calculateNextMove board pieces state = 
