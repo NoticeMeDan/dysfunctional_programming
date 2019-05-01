@@ -340,7 +340,7 @@ let theTwoWordsAdjacentToTile (x,y) placed board =
     wordAdjacentToTile (x,y) placed board -1 0, wordAdjacentToTile (x,y) placed board 0 -1
 
 // TODO. Gave dictionary as argument
-let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
+let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // helperMethods
     let isTileEmpty (x,y) = isTileEmpty (x,y) placed board
     let charOnTile (x,y) = charOnTile (x,y) placed board
@@ -348,11 +348,11 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
     let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize
     
     // board size
-    let c = ScrabbleUtil.Board.center board
-    let minX = fst c - radius
-    let maxX = fst c + radius
-    let minY = snd c - radius
-    let maxY = snd c + radius
+    let center = ScrabbleUtil.Board.center board
+    let minX = fst center - radius
+    let maxX = fst center + radius
+    let minY = snd center - radius
+    let maxY = snd center + radius
 
     // AI
     let occupiedTileLocations = [
@@ -361,8 +361,10 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
                     if (isTileEmpty (x,y))
                         then ()
                         else yield (x,y)
-         ]   
-
+         ]
+    
+    //let tileLocations = [ for (KeyValue(v, _)) in state.lettersPlaced -> v ]
+    
     // map to tile with most empty places for each string
     let mapCharToBestTile =
         occupiedTileLocations
@@ -406,7 +408,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         mapCharToBestTile
         |> Map.toList
         |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
+            let words = bestExtendingWord pieces state hand charLst (max placesX placesY) dict
             let word =
                 match words with
                 | [] -> None
