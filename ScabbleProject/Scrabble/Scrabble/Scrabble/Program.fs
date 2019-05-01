@@ -54,7 +54,7 @@ module RegEx =
     let printPoints points names =
         points
         |> Map.toList
-        |> List.iter(fun (k,v) ->  printfn "player %A have points: %A" (Map.find k names) v )
+        |> List.iter(fun (k,v) -> printfn "player %A have points: %A" (Map.find k names) v )
 
 module State = 
     type state = {
@@ -71,7 +71,7 @@ module State =
     let doubleLetterScore : tile = ('c', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 2) Map.empty)
     let trippleLetterScore : tile = ('b', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 3) Map.empty)
     
-    let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
+    let makeState lettersPlaced hand pieces = { state.lettersPlaced = lettersPlaced; state.hand = hand; state.pieces = pieces }
 
     let newState hand = makeState Map.empty hand
 
@@ -84,11 +84,11 @@ module State =
     
     // Add placed pieces to the local board state and return the updated state
     // TODO
-    let addPlacedPiecesToBoard (pcs:piecePlaced list) (st:state) =
-        let lettersPlaced' =
-            List.fold (fun lettersPlaced (coord, (_, piece)) ->
-                Map.add coord piece lettersPlaced) st.lettersPlaced pcs
-        overwriteLettersPlaced st lettersPlaced'
+    let addPlacedPiecesToBoard (pieces:piecePlaced list) (state:state) =
+        let updateLettersPlaced =
+                List.fold (fun lettersPlaced (coord, (_, piece)) ->
+                Map.add coord piece lettersPlaced) state.lettersPlaced pieces
+        overwriteLettersPlaced state updateLettersPlaced
     
     // Add pieces to hand and return the updated state
     // TODO
@@ -121,22 +121,23 @@ module CalculatePoints =
         compute 0
 
 // TODO
-let rec makeCombinations (lst ) =
-    let givenLenghtOflst = List.length lst
+let rec findAnagrams list =
+    let length = List.length list
     
-    let rec innerFunc currentWord index map=
-        if List.length currentWord < givenLenghtOflst then
-            let nextCurrentWord = currentWord @ [lst.[index]]
+    let rec combine word index map =
+        if List.length word < length then
+            let nextWord = word @ [list.[index]]
             let newMap = map |> Map.add index index 
-            [0 .. (givenLenghtOflst-1)]
+            
+            [0 .. (length-1)]
             |> List.fold (fun acc value ->
                 match Map.tryFind value newMap with
-                | None -> (innerFunc nextCurrentWord value newMap) @ acc
+                | None -> (combine nextWord value newMap) @ acc
                 | Some _ -> acc
-                ) [nextCurrentWord]
+                ) [nextWord]
         else []
 
-    [0 .. (givenLenghtOflst-1)] |> List.fold (fun acc value -> (innerFunc [] value Map.empty)@acc) []
+    [0 .. (length-1)] |> List.fold (fun acc value -> (combine [] value Map.empty)@acc) []
 // TODO
 let charListToString (cl:char list) = List.foldBack (fun x acc -> x.ToString() + acc) cl ""
 
@@ -174,7 +175,7 @@ let createMove word startPos goX goY =
 let createMoveFromListOfWords startPos goX goY describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::xt ->   createMove word startPos goX goY
+    | word::xt -> createMove word startPos goX goY
     
 // TODO
 let foldAddIndexSetToSet (index, set) acc =
@@ -219,7 +220,7 @@ let createWordCombinationsInHand hand pieces=
             |> List.fold (fun acc2 _ ->
                 acc2 @ [Map.find index pieces]) acc)
         []
-    |> makeCombinations
+    |> findAnagrams
     |> convertToListOfStrings
 
 // TODO
@@ -231,7 +232,7 @@ let createWordCombinationsInHandFromStartChar hand pieces startCharLst length=
             |> List.fold (fun acc2 _ ->
                 acc2 @ [Map.find index pieces]) acc)
         []
-    |> makeCombinations
+    |> findAnagrams
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
     |> List.map (fun string -> (startCharLst |> charListToString) + string)
@@ -258,19 +259,18 @@ let convertStringToPiece words mapCharToIndexes pieces =
                     )
     |> List.map (fun (x, map) -> x)
 
-// TODO. Gave dictionary as argument
-let filterWords (st : State.state) words dictionary = 
+let filterWords words dictionary = 
     words
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
 // TODO. Gave dictionary as argument
-let placeOnEmptyBoard center pieces (st : State.state) hand dict = 
+let placeOnEmptyBoard center pieces (state : State.state) hand dict = 
     let mapCharToIndexes = reversePiecesMap pieces hand
     printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand hand pieces
-    let filteredWords = filterWords st words dict 
+    let filteredWords = filterWords words dict 
     printfn "filteredWords: %A" filteredWords
     
     let describedWords =
@@ -285,7 +285,7 @@ let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictio
     let mapCharToIndexes = reversePiecesMap pieces hand
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
     let filteredWords =
-        filterWords st words dict
+        filterWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
     convertStringToPiece filteredWords mapCharToIndexes pieces
@@ -320,12 +320,6 @@ let emptyPlaces (x,y) placed board moveX moveY handSize =
             | true, false -> value
         else value
     innerFn (x,y) 0
-
-// TODO
-let emptyLeft (x,y) placed board = isTileEmpty (x-1,y) placed board
-
-// TODO
-let emptyAbove (x,y) placed board = isTileEmpty (x,y-1) placed board
 
 // TODO
 let wordAdjacentToTile (x,y) placed board moveX moveY =
