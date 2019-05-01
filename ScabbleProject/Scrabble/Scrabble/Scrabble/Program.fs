@@ -432,15 +432,12 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         
         createMove word (x,y) distanceX distanceY
 
-// TODO
-let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
-    // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
-    //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
-    match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
-    | None, Some (' ', map) ->      
-        placeOnEmptyBoard (board.center) pieces st hand dict
-    | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand dict
+let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius hand (dict:Dictionary.Dictionary) =
+    match Map.tryFind (board.center) state.lettersPlaced with
+    | None ->      
+        placeOnEmptyBoard (board.center) pieces state hand dict
+    | Some _ ->                                                   
+        PlaceOnNonEmptyBoard board pieces state radius state.lettersPlaced hand dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -462,7 +459,7 @@ let playGame cstream board pieces (st : State.state) words =
         printf "Word: %A -> %A\n" input (lookup input)
         let move =
             match input with
-            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+            | "AI" -> makeMove board pieces st 8  (State.lettersPlaced st) st.hand dict
             | "PASS" -> SMPass
             //| "NEW_HAND" -> SMChange
 
