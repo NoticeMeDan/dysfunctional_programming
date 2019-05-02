@@ -82,6 +82,7 @@ module State =
     let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
     
     // Add placed pieces to the local board state and return the updated state
+    // TODO rest of the method
     let addPlacedPiecesToBoard (pieces:piecePlaced list) (state:state) =
         let updateLettersPlaced =
                 List.fold (fun lettersPlaced (coord, (_, piece)) ->
@@ -89,11 +90,13 @@ module State =
         overwriteLettersPlaced state updateLettersPlaced
     
     // Add pieces to hand and return the updated state
+    // TODO rest of the method
     let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
         let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
         overwriteHand st hand'
         
     // Remove pieces from hand, given a list of moves played, and return the updated state
+    // TODO rest of the method
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
@@ -121,6 +124,7 @@ let rec findAnagrams list =
     let length = List.length list
     
     // Word is a List<String>
+    // TODO rest of the method
     let rec combine wordList index map =
         if List.length wordList < length then
             // Next wordList is current wordlist, with the appended list[index]
@@ -141,6 +145,7 @@ let rec findAnagrams list =
 let charactersToString (characters:char list) = List.foldBack (fun x acc -> x.ToString() + acc) characters ""
 
 let rec convertToCharList list =
+    // TODO rest of the method
     match list with
     | [] -> []
     | (char : Set<char*int>) :: xtt ->
@@ -152,6 +157,7 @@ let convertToListOfStrings (list : Set<char*int> list list) =
     list |> List.map (fun x -> x |> convertToCharList |> charactersToString)
 
 let pointSumOfWord word =
+    // TODO rest of the method
     let rec sumOfWord word =
         match word with 
         | [] -> 0
@@ -160,6 +166,7 @@ let pointSumOfWord word =
 
 let createMove word (startPos:coord) goX goY =
     word
+    // TODO rest of the method
     |> List.map (fun (a , x) -> (uint32 a, (Set.toList x).[0]))
     |> List.fold (fun ((x, y), c) value -> ((x + goX, y + goY), ((x,y), value)::c) ) (startPos, [])
     |> function | (_, x) -> x
@@ -171,6 +178,7 @@ let createMoveFromListOfWords startPos goX goY describedWords =
     | word::xt -> createMove word startPos goX goY
     
 let foldAddIndexSetToSet (index, set) acc =
+    // TODO rest of the method
     let rec aux result rest =
         match rest with
         | [] -> result
@@ -180,6 +188,7 @@ let foldAddIndexSetToSet (index, set) acc =
 
 let reverseMapKeyValue pieces hand =
     hand
+    // TODO rest of the method
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
             [1u .. ammountAvailable]
@@ -198,6 +207,7 @@ let reverseMapKeyValue pieces hand =
 
 let createWordsFromHand hand pieces= 
     hand
+    // TODO rest of the method
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
             [1u .. ammountAvailable]
@@ -209,6 +219,7 @@ let createWordsFromHand hand pieces=
 
 let createWordsFromStartChar hand pieces startCharLst length = 
     hand
+    // TODO rest of the method
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
             [1u .. ammountAvailable]
@@ -230,6 +241,7 @@ let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
 let convertStringToPiece words mapCharToIndexes pieces = 
     words |> List.map (fun word ->
         word
+        // TODO rest of the method
         |> Seq.toList
         |> List.fold (
             fun (accRes, accmapCharToIndexes) c ->
@@ -245,7 +257,7 @@ let findLegalWords words dictionary =
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
-let placeOnEmptyBoard center pieces (state : State.state) dict = 
+let placeOnEmptyBoard center pieces (state : State.state) dict =
     let mapCharToIndexes = reverseMapKeyValue pieces state.hand
 
     let words = createWordsFromHand state.hand pieces
@@ -258,7 +270,8 @@ let placeOnEmptyBoard center pieces (state : State.state) dict =
     wordsToPieceListList
     |> createMoveFromListOfWords center 1 0
 
-let bestWord pieces hand charList length (dict:Dictionary.Dictionary) = 
+let bestWord pieces hand charList length (dict:Dictionary.Dictionary) =
+    // TODO rest of the method
     let mapCharToIndexes = reverseMapKeyValue pieces hand
     let words = createWordsFromStartChar hand pieces charList length
     let legalWords =
@@ -280,6 +293,7 @@ let isTileEmpty (coord:coord) lettersPlaces (board:ScrabbleUtil.board) boardRadi
         | Some _ -> false
 
 let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY handSize boardRadius =
+    // TODO rest of the method
     let handSize = int handSize
     let rec innerFn (coord:coord) value =
         if (value < handSize)
@@ -296,6 +310,7 @@ let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX mov
     innerFn coord 0
 
 let wordAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY radius =
+    // TODO rest of the method
     let rec innerFn (coord:coord) value =
         if (isTileEmpty coord lettersPlaced board radius) then value
         else 
@@ -326,6 +341,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
     // map to tile with most empty places for each string
     let mapCharToBestTile =
         occupiedTiles
+        // TODO rest of the piping
         |> List.map (
                 fun coord -> 
                 let freeSpacesX = emptyPlaces coord 1 0
@@ -356,6 +372,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
 
     let listBestChar =
         mapCharToBestTile
+        // TODO rest of the piping
         |> Map.toList
         |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
             let words = bestWord pieces state.hand charLst (max placesX placesY) dict
