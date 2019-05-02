@@ -371,29 +371,29 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius hand (dict:Di
     let mapCharToBestTile =
         occupiedTiles
         |> List.map (fun coord -> 
-            let placesX = emptyPlaces coord 1 0
-            let placesY = emptyPlaces coord 0 1
-            (coord, placesX, placesY)
+            let freeSpacesX = emptyPlaces coord 1 0
+            let freeSpacesY = emptyPlaces coord 0 1
+            (coord, freeSpacesX, freeSpacesY)
             )
-        |> List.filter (fun (coord, placesX, placesY) -> placesX > 0 || placesY > 0)
+        |> List.filter (fun (coord, freeSpacesX, freeSpacesY) -> freeSpacesX > 0 || freeSpacesY > 0)
         |> List.map
-            (fun (coord, placesX, placesY) ->
-                (theTwoWordsAdjacentToTile coord state.lettersPlaced board radius, (coord, placesX, placesY)))
+            (fun (coord, freeSpacesX, freeSpacesY) ->
+                (theTwoWordsAdjacentToTile coord state.lettersPlaced board radius, (coord, freeSpacesX, freeSpacesY)))
         |> List.fold
-            (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
+            (fun acc ((stringX, stringY), ((x,y), freeSpacesX, freeSpacesY)) ->
                 let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
                 
                 let updateMap string _placesX _placesY acc = 
                     if _placesX = -1 && _placesY = -1 then acc
                     else 
-                        let tilesPlaces = max placesX placesY
+                        let tilesPlaces = max freeSpacesX freeSpacesY
                         match Map.tryFind string acc with
                         | None -> acc |> addTo string _placesX _placesY
                         | Some (_, plx, ply) -> if (max plx ply) < tilesPlaces then acc |> addTo string _placesX _placesY else acc
 
                 if stringX = stringY
-                then  acc |> updateMap stringX placesX placesY
-                else  acc |> updateMap stringX placesX -1 |> updateMap stringY -1 placesY  
+                then  acc |> updateMap stringX freeSpacesX freeSpacesY
+                else  acc |> updateMap stringX freeSpacesX -1 |> updateMap stringY -1 freeSpacesY  
             )
             Map.empty
     
