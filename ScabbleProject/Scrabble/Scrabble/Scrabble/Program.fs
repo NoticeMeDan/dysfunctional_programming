@@ -144,27 +144,24 @@ let rec findAnagrams list =
     
 let charactersToString (characters:char list) = List.foldBack (fun x acc -> x.ToString() + acc) characters ""
 
-// TODO
-let rec setCharIntListToCharList lst =
-    match lst with
+let rec convertToCharList list =
+    match list with
     | [] -> []
     | (char : Set<char*int>) :: xtt ->
-        let x =
-            char
-            |> Set.map (fun (c, i)->c)
-            |> Set.toArray
-        [x.[0]] @ (setCharIntListToCharList xtt)        //todo don't just take the first
+        let x = char |> Set.map (fun (k, v) -> k) |> Set.toArray
+        
+        [x.[0]] @ (convertToCharList xtt) // returning the first. Change this to return all
+        
+let convertToListOfStrings (list : Set<char*int> list list) =
+    list |> List.map (fun x -> x |> convertToCharList |> charactersToString)
 
 // TODO
-let convertToListOfStrings (lst : Set<char*int> list list) =
-    lst
-    |>List.map (fun x -> x |> setCharIntListToCharList |> charactersToString)
-
-// TODO
-let rec sumOfWord word =
-    match word with 
-    | [] -> 0
-    | (index, set)::xt -> (snd (set |>Set.toList).[0]) + (sumOfWord xt) 
+let pointSumOfWord word =
+    let rec sumOfWord word =
+        match word with 
+        | [] -> 0
+        | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (sumOfWord xt)
+    sumOfWord word
 
 // TODO
 let createMove word startPos goX goY =
@@ -278,7 +275,7 @@ let placeOnEmptyBoard center pieces (state : State.state)  dict =
     
     let describedWords =
         convertStringToPiece filteredWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> sumOfWord x)
+        |> List.sortByDescending (fun x -> pointSumOfWord x)
     
     describedWords
     |> createMoveFromListOfWords center 1 0
@@ -292,7 +289,7 @@ let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictio
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
     convertStringToPiece filteredWords mapCharToIndexes pieces
-    |> List.map (fun x -> (sumOfWord x, x))
+    |> List.map (fun x -> (pointSumOfWord x, x))
     |> List.sortByDescending (fun (sum, x) -> sum)
 
 // TODO
@@ -306,9 +303,6 @@ let isTileEmpty (coord:coord) lettersPlaces (board:ScrabbleUtil.board) boardRadi
     match Map.tryFind coord lettersPlaces with
         | None -> true
         | Some _ -> false
-    
-    //let c = charOnTile (x,y) placed board
-    //((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1
 
 // TODO
 let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY handSize boardRadius =
