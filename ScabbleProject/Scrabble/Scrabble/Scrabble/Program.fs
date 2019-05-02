@@ -178,7 +178,7 @@ let foldAddIndexSetToSet (index, set) acc =
     
     (aux [] set) @ acc
 
-let reversePiecesMap pieces hand =
+let reverseMapKeyValue pieces hand =
     hand
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
@@ -207,7 +207,7 @@ let createWordCombinationsInHand hand pieces=
     |> findAnagrams
     |> convertToListOfStrings
 
-let createWordCombinationsInHandFromStartChar hand pieces startCharLst length= 
+let createWordFromStartChar hand pieces startCharLst length = 
     hand
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
@@ -246,7 +246,7 @@ let filterWords words dictionary =
     |> List.distinct
 
 let placeOnEmptyBoard center pieces (state : State.state) dict = 
-    let mapCharToIndexes = reversePiecesMap pieces state.hand
+    let mapCharToIndexes = reverseMapKeyValue pieces state.hand
     //printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand state.hand pieces
@@ -260,22 +260,21 @@ let placeOnEmptyBoard center pieces (state : State.state) dict =
     describedWords
     |> createMoveFromListOfWords center 1 0
 
-let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictionary.Dictionary)= 
-    let mapCharToIndexes = reversePiecesMap pieces hand
-    let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
+let bestExtendingWord pieces (st : State.state) hand charList lenght (dict:Dictionary.Dictionary)= 
+    let mapCharToIndexes = reverseMapKeyValue pieces hand
+    let words = createWordFromStartChar hand pieces charList lenght
     let filteredWords =
         filterWords words dict
-        |> List.map (fun string -> string.Remove (0, (List.length charLst)))
+        |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
     convertStringToPiece filteredWords mapCharToIndexes pieces
     |> List.map (fun x -> (pointSumOfWord x, x))
     |> List.sortByDescending (fun (sum, x) -> sum)
 
 let charOnTile (coord:coord) placed board =
-    match Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord with
-    | None, Some (c, _) -> c
-    | Some (c, _), _    -> c
-    | _, None -> ' '
+    match Map.tryFind coord placed with
+    | Some (c, _) -> c
+    | None -> ' '
 
 let isTileEmpty (coord:coord) lettersPlaces (board:ScrabbleUtil.board) boardRadius =
     match Map.tryFind coord lettersPlaces with
