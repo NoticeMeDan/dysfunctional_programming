@@ -50,7 +50,6 @@ module RegEx =
                 | _, None -> printf "# "
             printf "\n"
     
-    // TODO
     let printPoints points names =
         points
         |> Map.toList
@@ -83,7 +82,6 @@ module State =
     let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
     
     // Add placed pieces to the local board state and return the updated state
-    // TODO
     let addPlacedPiecesToBoard (pieces:piecePlaced list) (state:state) =
         let updateLettersPlaced =
                 List.fold (fun lettersPlaced (coord, (_, piece)) ->
@@ -91,13 +89,11 @@ module State =
         overwriteLettersPlaced state updateLettersPlaced
     
     // Add pieces to hand and return the updated state
-    // TODO
     let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
         let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
         overwriteHand st hand'
         
     // Remove pieces from hand, given a list of moves played, and return the updated state
-    // TODO
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
@@ -155,7 +151,6 @@ let rec convertToCharList list =
 let convertToListOfStrings (list : Set<char*int> list list) =
     list |> List.map (fun x -> x |> convertToCharList |> charactersToString)
 
-// TODO
 let pointSumOfWord word =
     let rec sumOfWord word =
         match word with 
@@ -163,21 +158,18 @@ let pointSumOfWord word =
         | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (sumOfWord xt)
     sumOfWord word
 
-// TODO
-let createMove word startPos goX goY =
+let createMove word (startPos:coord) goX goY =
     word
-    |> List.map (fun (a ,x) -> (uint32 a, (Set.toList x).[0]))
+    |> List.map (fun (a , x) -> (uint32 a, (Set.toList x).[0]))
     |> List.fold (fun ((x, y), c) value -> ((x + goX, y + goY), ((x,y), value)::c) ) (startPos, [])
-    |>function | (_, x) -> x
+    |> function | (_, x) -> x
     |> SMPlay
 
-// TODO
 let createMoveFromListOfWords startPos goX goY describedWords =
     match describedWords with
     | [] -> SMPass
     | word::xt -> createMove word startPos goX goY
     
-// TODO
 let foldAddIndexSetToSet (index, set) acc =
     let rec aux result rest =
         match rest with
@@ -186,14 +178,7 @@ let foldAddIndexSetToSet (index, set) acc =
     
     (aux [] set) @ acc
 
-// TODO
 let reversePiecesMap pieces hand =
-    //convert hand to list of (index, set list) list
-    // list.fold  (index, set list) list ->  (index, char, points) list
-    //sort points
-    // map (index, char, points) list -> (char, index) list
-    // list.fold (char, index) list -> map<char, index list>
-
     hand
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
@@ -211,7 +196,6 @@ let reversePiecesMap pieces hand =
         )
         Map.empty
 
-// TODO
 let createWordCombinationsInHand hand pieces= 
     hand
     |> MultiSet.fold
@@ -223,7 +207,6 @@ let createWordCombinationsInHand hand pieces=
     |> findAnagrams
     |> convertToListOfStrings
 
-// TODO
 let createWordCombinationsInHandFromStartChar hand pieces startCharLst length= 
     hand
     |> MultiSet.fold
@@ -237,7 +220,6 @@ let createWordCombinationsInHandFromStartChar hand pieces startCharLst length=
     |> List.filter (fun string -> length >= string.Length)
     |> List.map (fun string -> (startCharLst |> charactersToString) + string)
 
-// TODO
 let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
     
     let intList = Map.find key map
@@ -245,7 +227,6 @@ let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
 
     (intList.Head, map)
 
-// TODO
 let convertStringToPiece words mapCharToIndexes pieces = 
     words
     |> List.map (fun word ->
@@ -264,8 +245,7 @@ let filterWords words dictionary =
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
-// TODO. Gave dictionary as argument
-let placeOnEmptyBoard center pieces (state : State.state)  dict = 
+let placeOnEmptyBoard center pieces (state : State.state) dict = 
     let mapCharToIndexes = reversePiecesMap pieces state.hand
     //printfn "%A" mapCharToIndexes
 
@@ -280,7 +260,6 @@ let placeOnEmptyBoard center pieces (state : State.state)  dict =
     describedWords
     |> createMoveFromListOfWords center 1 0
 
-// TODO
 let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictionary.Dictionary)= 
     let mapCharToIndexes = reversePiecesMap pieces hand
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
@@ -292,7 +271,6 @@ let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictio
     |> List.map (fun x -> (pointSumOfWord x, x))
     |> List.sortByDescending (fun (sum, x) -> sum)
 
-// TODO
 let charOnTile (coord:coord) placed board =
     match Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord with
     | None, Some (c, _) -> c
@@ -304,7 +282,6 @@ let isTileEmpty (coord:coord) lettersPlaces (board:ScrabbleUtil.board) boardRadi
         | None -> true
         | Some _ -> false
 
-// TODO
 let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY handSize boardRadius =
     let handSize = int handSize
     let rec innerFn (coord:coord) value =
@@ -321,7 +298,6 @@ let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX mov
         else value
     innerFn coord 0
 
-// TODO
 let wordAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY radius =
     let rec innerFn (coord:coord) value =
         if (isTileEmpty coord lettersPlaced board radius) then value
@@ -331,12 +307,10 @@ let wordAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) mo
             innerFn newCoords (charOnTile::value)
     innerFn coord []
 
-// TODO
 let theTwoWordsAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) radius =
     wordAdjacentToTile coord lettersPlaced board -1 0 radius,
     wordAdjacentToTile coord lettersPlaced board 0 -1 radius
 
-// TODO. Gave dictionary as argument
 let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     // helperMethods
     //let isTileEmpty (x,y) = isTileEmpty (x,y) state.lettersPlaced board radius
@@ -397,7 +371,6 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
 // listBestChar should go from type 'a list  to ('a * 'a ) list
 // bestExtendingWord shuld be refractored
 
-    // TODO
     let listBestChar =
         mapCharToBestTile
         |> Map.toList
@@ -413,7 +386,6 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
         |> List.map (fun (c, word) -> (c, word.Value))
         |> List.sortBy (fun (c, (sum, word)) -> sum)
 
-    // TODO
     match listBestChar with
     | [] -> SMForfeit
     | (char, (sum, word))::_ -> 
