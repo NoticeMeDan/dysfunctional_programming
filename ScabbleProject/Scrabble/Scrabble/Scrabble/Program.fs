@@ -85,7 +85,7 @@ module State =
     let addPlacedPiecesToBoard (pieces:piecePlaced list) (state:state) =
         let updateLettersPlaced =
                 List.fold (fun lettersPlaced (coord, (_, piece)) ->
-                Map.add coord piece lettersPlaced) state.lettersPlaced pieces
+                    Map.add coord piece lettersPlaced) state.lettersPlaced pieces
         overwriteLettersPlaced state updateLettersPlaced
     
     // Add pieces to hand and return the updated state
@@ -196,7 +196,7 @@ let reverseMapKeyValue pieces hand =
         )
         Map.empty
 
-let createWordCombinationsInHand hand pieces= 
+let createWordsFromHand hand pieces= 
     hand
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
@@ -207,7 +207,7 @@ let createWordCombinationsInHand hand pieces=
     |> findAnagrams
     |> convertToListOfStrings
 
-let createWordFromStartChar hand pieces startCharLst length = 
+let createWordsFromStartChar hand pieces startCharLst length = 
     hand
     |> MultiSet.fold
         (fun acc index ammountAvailable ->
@@ -228,16 +228,16 @@ let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
     (intList.Head, map)
 
 let convertStringToPiece words mapCharToIndexes pieces = 
-    words
-    |> List.map (fun word ->
-                        word
-                        |> Seq.toList
-                        |> List.fold
-                            (fun (accRes, accmapCharToIndexes) c ->
-                                      let (index, map) = getAndRemoveIndexFromMap c mapCharToIndexes
-                                      (accRes @ [(index, Map.find index pieces)], map) )
-                            ([], mapCharToIndexes)
-                    )
+    words |> List.map (fun word ->
+        word
+        |> Seq.toList
+        |> List.fold (
+            fun (accRes, accmapCharToIndexes) c ->
+            let (index, map) = getAndRemoveIndexFromMap c mapCharToIndexes
+            (accRes @ [(index, Map.find index pieces)], map)
+        )
+            ([], mapCharToIndexes)
+    )
     |> List.map (fun (x, map) -> x)
 
 let findLegalWords words dictionary = 
@@ -247,22 +247,20 @@ let findLegalWords words dictionary =
 
 let placeOnEmptyBoard center pieces (state : State.state) dict = 
     let mapCharToIndexes = reverseMapKeyValue pieces state.hand
-    //printfn "%A" mapCharToIndexes
 
-    let words = createWordCombinationsInHand state.hand pieces
-    let filteredWords = findLegalWords words dict 
-    //printfn "filteredWords: %A" filteredWords
+    let words = createWordsFromHand state.hand pieces
+    let legalWords = findLegalWords words dict 
     
-    let describedWords =
-        convertStringToPiece filteredWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> pointSumOfWord x)
+    let wordsToPieceListList =
+        convertStringToPiece legalWords mapCharToIndexes pieces
+        |> List.sortByDescending (fun n -> pointSumOfWord n)
     
-    describedWords
+    wordsToPieceListList
     |> createMoveFromListOfWords center 1 0
 
-let bestExtendingWord pieces (st : State.state) hand charList lenght (dict:Dictionary.Dictionary)= 
+let bestWord pieces hand charList length (dict:Dictionary.Dictionary) = 
     let mapCharToIndexes = reverseMapKeyValue pieces hand
-    let words = createWordFromStartChar hand pieces charList lenght
+    let words = createWordsFromStartChar hand pieces charList length
     let legalWords =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
@@ -355,20 +353,12 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
                 else  acc |> updateMap stringX freeSpacesX -1 |> updateMap stringY -1 freeSpacesY  
             )
             Map.empty
-    
-// todos:
-// place letter in the middle of a word - see comment at the line 408
-// singleletter score, double, etc
-
-// mapCharToBestTile should go from type map<char list, (int*int)*int*int) to map<char list, (int*int)*(int*int)*(int*int))
-// listBestChar should go from type 'a list  to ('a * 'a ) list
-// bestExtendingWord shuld be refractored
 
     let listBestChar =
         mapCharToBestTile
         |> Map.toList
         |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces state state.hand charLst (max placesX placesY) dict
+            let words = bestWord pieces state.hand charLst (max placesX placesY) dict
             let word =
                 match words with
                 | [] -> None
