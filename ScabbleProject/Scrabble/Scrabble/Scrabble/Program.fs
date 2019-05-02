@@ -3,7 +3,6 @@ open System.IO
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
-open State
 open System.Net.Sockets
 
 // From Jesper.
@@ -143,8 +142,7 @@ let rec findAnagrams list =
     // Combine for every index of the given list. 
     [0 .. (length-1)] |> List.fold (fun acc index -> (combine [] index Map.empty)@acc) []
     
-// TODO
-let charListToString (cl:char list) = List.foldBack (fun x acc -> x.ToString() + acc) cl ""
+let charactersToString (characters:char list) = List.foldBack (fun x acc -> x.ToString() + acc) characters ""
 
 // TODO
 let rec setCharIntListToCharList lst =
@@ -160,7 +158,7 @@ let rec setCharIntListToCharList lst =
 // TODO
 let convertToListOfStrings (lst : Set<char*int> list list) =
     lst
-    |>List.map (fun x -> x |> setCharIntListToCharList |> charListToString)
+    |>List.map (fun x -> x |> setCharIntListToCharList |> charactersToString)
 
 // TODO
 let rec sumOfWord word =
@@ -240,7 +238,7 @@ let createWordCombinationsInHandFromStartChar hand pieces startCharLst length=
     |> findAnagrams
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
-    |> List.map (fun string -> (startCharLst |> charListToString) + string)
+    |> List.map (fun string -> (startCharLst |> charactersToString) + string)
 
 // TODO
 let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
