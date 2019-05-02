@@ -304,21 +304,21 @@ let charOnTile (x,y) placed board=
     | _, None -> ' '
 
 // TODO
-let isTileEmpty (x,y) placed board =
+let isTileEmpty (x,y) placed board boardRadius =
     let c = charOnTile (x,y) placed board
-    (' ' = c ) || (System.Char.IsLower c)
+    ((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1 
 
 // TODO
-let emptyPlaces (x,y) placed board moveX moveY handSize =
+let emptyPlaces (x,y) placed board moveX moveY handSize boardRadius =
     let handSize = int handSize
     let rec innerFn (x,y) value =
         if (value < handSize)
         then
             let newCoords = (x + moveX, y + moveY)
-            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board
-            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board
+            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board boardRadius
+            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board boardRadius
             let neighborIsOkay = neighborCheck1 && neighborCheck2
-            match isTileEmpty newCoords placed board , neighborIsOkay with
+            match isTileEmpty newCoords placed board boardRadius, neighborIsOkay with
             | true, true ->  (innerFn newCoords (value + 1))
             | false, _ -> value-1
             | true, false -> value
@@ -326,9 +326,9 @@ let emptyPlaces (x,y) placed board moveX moveY handSize =
     innerFn (x,y) 0
 
 // TODO
-let wordAdjacentToTile (x,y) placed board moveX moveY =
+let wordAdjacentToTile (x,y) placed board moveX moveY radius =
     let rec innerFn (x,y) value =
-        if (isTileEmpty (x,y) placed board ) then value
+        if (isTileEmpty (x,y) placed board radius) then value
         else 
             let newCoords = (x + moveX, y + moveY)
             let charOnTile = charOnTile (x,y) placed board
@@ -336,16 +336,16 @@ let wordAdjacentToTile (x,y) placed board moveX moveY =
     innerFn (x,y) []
 
 // TODO
-let theTwoWordsAdjacentToTile (x,y) placed board =
-    wordAdjacentToTile (x,y) placed board -1 0, wordAdjacentToTile (x,y) placed board 0 -1
+let theTwoWordsAdjacentToTile (x,y) placed board radius =
+    wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
 let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // helperMethods
-    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board
+    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
     let charOnTile (x,y) = charOnTile (x,y) placed board
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize
+    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize radius
     
     // board size
     let center = ScrabbleUtil.Board.center board
@@ -373,7 +373,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (
         |> List.filter (fun ((x,y), placesX, placesY) -> placesX > 0 || placesY > 0)
         |> List.map
             (fun ((x,y), placesX, placesY) ->
-                (theTwoWordsAdjacentToTile (x,y) placed board, ((x,y), placesX, placesY)))
+                (theTwoWordsAdjacentToTile (x,y) placed board radius, ((x,y), placesX, placesY)))
         |> List.fold
             (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
                 let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
@@ -418,7 +418,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (
 
     // TODO
     match listBestChar with
-    | [] -> SMPass
+    | [] -> SMForfeit
     | (char, (sum, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find char mapCharToBestTile
 
