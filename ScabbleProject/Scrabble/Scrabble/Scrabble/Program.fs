@@ -240,7 +240,7 @@ let convertStringToPiece words mapCharToIndexes pieces =
                     )
     |> List.map (fun (x, map) -> x)
 
-let filterWords words dictionary = 
+let findLegalWords words dictionary = 
     words
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
@@ -250,7 +250,7 @@ let placeOnEmptyBoard center pieces (state : State.state) dict =
     //printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand state.hand pieces
-    let filteredWords = filterWords words dict 
+    let filteredWords = findLegalWords words dict 
     //printfn "filteredWords: %A" filteredWords
     
     let describedWords =
@@ -263,11 +263,11 @@ let placeOnEmptyBoard center pieces (state : State.state) dict =
 let bestExtendingWord pieces (st : State.state) hand charList lenght (dict:Dictionary.Dictionary)= 
     let mapCharToIndexes = reverseMapKeyValue pieces hand
     let words = createWordFromStartChar hand pieces charList lenght
-    let filteredWords =
-        filterWords words dict
+    let legalWords =
+        findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
-    convertStringToPiece filteredWords mapCharToIndexes pieces
+    convertStringToPiece legalWords mapCharToIndexes pieces
     |> List.map (fun x -> (pointSumOfWord x, x))
     |> List.sortByDescending (fun (sum, x) -> sum)
 
@@ -420,6 +420,7 @@ let playGame cstream board pieces (st : State.state) words =
             match input with
             | "AI" -> makeMove board pieces state 8 dict
             | "PASS" -> SMPass
+            | _ -> SMPass 
             //| "NEW_HAND" -> SMChange
 
         printfn "Trying to play: %A" move
@@ -432,19 +433,19 @@ let playGame cstream board pieces (st : State.state) words =
             printfn "points: %A" points
             printfn "new pieces %A" newPieces
             
-            let st' = state |> (State.addPlacedPiecesToBoard moves
+            let newState = state |> (State.addPlacedPiecesToBoard moves
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
-            aux st'
+            aux newState
         | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
-            let st' = state |> State.addPlacedPiecesToBoard moves
-            aux st'
+            let newState = state |> State.addPlacedPiecesToBoard moves
+            aux newState
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
-            let st' = state // This state needs to be updated
-            aux st'
+            let newState = state // This state needs to be updated
+            aux newState
         | RCM (CMGameOver _) -> ()
         | RCM a -> failwith (sprintf "not implmented: %A" a)
         | RErr err -> printfn "Server Error:\n%A" err; aux state
