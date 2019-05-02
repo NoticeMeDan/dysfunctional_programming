@@ -3,6 +3,7 @@ open System.IO
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
+open State
 open System.Net.Sockets
 
 // From Jesper.
@@ -271,11 +272,11 @@ let filterWords words dictionary =
 // TODO. Gave dictionary as argument
 let placeOnEmptyBoard center pieces (state : State.state) hand dict = 
     let mapCharToIndexes = reversePiecesMap pieces hand
-    printfn "%A" mapCharToIndexes
+    //printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand hand pieces
     let filteredWords = filterWords words dict 
-    printfn "filteredWords: %A" filteredWords
+    //printfn "filteredWords: %A" filteredWords
     
     let describedWords =
         convertStringToPiece filteredWords mapCharToIndexes pieces
@@ -297,55 +298,59 @@ let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictio
     |> List.sortByDescending (fun (sum, x) -> sum)
 
 // TODO
-let charOnTile (x,y) placed board=
-    match Map.tryFind (x, y) placed, ScrabbleUtil.Board.tiles board (x, y) with
+let charOnTile (coord:coord) placed board =
+    match Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord with
     | None, Some (c, _) -> c
     | Some (c, _), _    -> c
     | _, None -> ' '
 
-// TODO
-let isTileEmpty (x,y) placed board boardRadius =
-    let c = charOnTile (x,y) placed board
-    ((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1 
+let isTileEmpty (coord:coord) lettersPlaces (board:ScrabbleUtil.board) boardRadius =
+    match Map.tryFind coord lettersPlaces with
+        | None -> true
+        | Some _ -> false
+    
+    //let c = charOnTile (x,y) placed board
+    //((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1
 
 // TODO
-let emptyPlaces (x,y) placed board moveX moveY handSize boardRadius =
+let emptyPlaces (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY handSize boardRadius =
     let handSize = int handSize
-    let rec innerFn (x,y) value =
+    let rec innerFn (coord:coord) value =
         if (value < handSize)
         then
-            let newCoords = (x + moveX, y + moveY)
-            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board boardRadius
-            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board boardRadius
+            let newCoords = ((fst coord) + moveX, (snd coord) + moveY)
+            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) lettersPlaced board boardRadius
+            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) lettersPlaced board boardRadius
             let neighborIsOkay = neighborCheck1 && neighborCheck2
-            match isTileEmpty newCoords placed board boardRadius, neighborIsOkay with
+            match isTileEmpty newCoords lettersPlaced board boardRadius, neighborIsOkay with
             | true, true ->  (innerFn newCoords (value + 1))
             | false, _ -> value-1
             | true, false -> value
         else value
-    innerFn (x,y) 0
+    innerFn coord 0
 
 // TODO
-let wordAdjacentToTile (x,y) placed board moveX moveY radius =
-    let rec innerFn (x,y) value =
-        if (isTileEmpty (x,y) placed board radius) then value
+let wordAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) moveX moveY radius =
+    let rec innerFn (coord:coord) value =
+        if (isTileEmpty coord lettersPlaced board radius) then value
         else 
-            let newCoords = (x + moveX, y + moveY)
-            let charOnTile = charOnTile (x,y) placed board
+            let newCoords = ((fst coord) + moveX, (snd coord) + moveY)
+            let charOnTile = charOnTile coord lettersPlaced board
             innerFn newCoords (charOnTile::value)
-    innerFn (x,y) []
+    innerFn coord []
 
 // TODO
-let theTwoWordsAdjacentToTile (x,y) placed board radius =
-    wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
+let theTwoWordsAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) radius =
+    wordAdjacentToTile coord lettersPlaced board -1 0 radius,
+    wordAdjacentToTile coord lettersPlaced board 0 -1 radius
 
 // TODO. Gave dictionary as argument
-let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (dict:Dictionary.Dictionary)=
+let PlaceOnNonEmptyBoard board pieces (state : State.state) radius hand (dict:Dictionary.Dictionary)=
     // helperMethods
-    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
-    let charOnTile (x,y) = charOnTile (x,y) placed board
+    let isTileEmpty (x,y) = isTileEmpty (x,y) state.lettersPlaced board radius
+    let charOnTile (x,y) = charOnTile (x,y) state.lettersPlaced board
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize radius
+    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) state.lettersPlaced board moveX moveY handSize radius
     
     // board size
     let center = ScrabbleUtil.Board.center board
@@ -365,15 +370,15 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (
     // map to tile with most empty places for each string
     let mapCharToBestTile =
         occupiedTiles
-        |> List.map (fun (x,y) -> 
-            let placesX = emptyPlaces (x,y) 1 0
-            let placesY = emptyPlaces (x,y) 0 1
-            ((x,y), placesX, placesY)
+        |> List.map (fun coord -> 
+            let placesX = emptyPlaces coord 1 0
+            let placesY = emptyPlaces coord 0 1
+            (coord, placesX, placesY)
             )
-        |> List.filter (fun ((x,y), placesX, placesY) -> placesX > 0 || placesY > 0)
+        |> List.filter (fun (coord, placesX, placesY) -> placesX > 0 || placesY > 0)
         |> List.map
-            (fun ((x,y), placesX, placesY) ->
-                (theTwoWordsAdjacentToTile (x,y) placed board radius, ((x,y), placesX, placesY)))
+            (fun (coord, placesX, placesY) ->
+                (theTwoWordsAdjacentToTile coord state.lettersPlaced board radius, (coord, placesX, placesY)))
         |> List.fold
             (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
                 let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
@@ -433,10 +438,8 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (
 
 let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
     match Map.tryFind (board.center) state.lettersPlaced with
-    | None ->      
-        placeOnEmptyBoard (board.center) pieces state state.hand dict
-    | Some _ ->                                                   
-        PlaceOnNonEmptyBoard board pieces state radius state.lettersPlaced state.hand dict
+    | None -> placeOnEmptyBoard (board.center) pieces state state.hand dict
+    | Some _ -> PlaceOnNonEmptyBoard board pieces state radius state.hand dict
 
 let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
@@ -445,7 +448,7 @@ let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictio
     | None, Some (' ', map) ->      
         placeOnEmptyBoard (board.center) pieces st hand dict
     | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand dict
+        PlaceOnNonEmptyBoard board pieces (st : State.state) radius hand dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
