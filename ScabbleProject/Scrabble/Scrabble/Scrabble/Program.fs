@@ -270,11 +270,11 @@ let filterWords words dictionary =
     |> List.distinct
 
 // TODO. Gave dictionary as argument
-let placeOnEmptyBoard center pieces (state : State.state) hand dict = 
-    let mapCharToIndexes = reversePiecesMap pieces hand
+let placeOnEmptyBoard center pieces (state : State.state)  dict = 
+    let mapCharToIndexes = reversePiecesMap pieces state.hand
     //printfn "%A" mapCharToIndexes
 
-    let words = createWordCombinationsInHand hand pieces
+    let words = createWordCombinationsInHand state.hand pieces
     let filteredWords = filterWords words dict 
     //printfn "filteredWords: %A" filteredWords
     
@@ -345,12 +345,12 @@ let theTwoWordsAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.bo
     wordAdjacentToTile coord lettersPlaced board 0 -1 radius
 
 // TODO. Gave dictionary as argument
-let PlaceOnNonEmptyBoard board pieces (state : State.state) radius hand (dict:Dictionary.Dictionary)=
+let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     // helperMethods
-    let isTileEmpty (x,y) = isTileEmpty (x,y) state.lettersPlaced board radius
-    let charOnTile (x,y) = charOnTile (x,y) state.lettersPlaced board
-    let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) state.lettersPlaced board moveX moveY handSize radius
+    //let isTileEmpty (x,y) = isTileEmpty (x,y) state.lettersPlaced board radius
+    //let charOnTile (x,y) = charOnTile (x,y) state.lettersPlaced board
+    let handSize = state.hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
+    let emptyPlaces (coord:coord) moveX moveY = emptyPlaces coord state.lettersPlaced board moveX moveY handSize radius
     
     // board size
     let center = ScrabbleUtil.Board.center board
@@ -410,7 +410,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius hand (dict:Di
         mapCharToBestTile
         |> Map.toList
         |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces state hand charLst (max placesX placesY) dict
+            let words = bestExtendingWord pieces state state.hand charLst (max placesX placesY) dict
             let word =
                 match words with
                 | [] -> None
@@ -438,8 +438,8 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius hand (dict:Di
 
 let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
     match Map.tryFind (board.center) state.lettersPlaced with
-    | None -> placeOnEmptyBoard (board.center) pieces state state.hand dict
-    | Some _ -> PlaceOnNonEmptyBoard board pieces state radius state.hand dict
+    | None -> placeOnEmptyBoard (board.center) pieces state dict
+    | Some _ -> PlaceOnNonEmptyBoard board pieces state radius dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
