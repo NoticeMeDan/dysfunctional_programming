@@ -271,7 +271,7 @@ let bestExtendingWord pieces (st : State.state) hand charList lenght (dict:Dicti
     |> List.map (fun x -> (pointSumOfWord x, x))
     |> List.sortByDescending (fun (sum, x) -> sum)
 
-let charOnTile (coord:coord) placed board =
+let charOnTile (coord:coord) placed =
     match Map.tryFind coord placed with
     | Some (c, _) -> c
     | None -> ' '
@@ -302,7 +302,7 @@ let wordAdjacentToTile (coord:coord) lettersPlaced (board:ScrabbleUtil.board) mo
         if (isTileEmpty coord lettersPlaced board radius) then value
         else 
             let newCoords = ((fst coord) + moveX, (snd coord) + moveY)
-            let charOnTile = charOnTile coord lettersPlaced board
+            let charOnTile = charOnTile coord lettersPlaced
             innerFn newCoords (charOnTile::value)
     innerFn coord []
 
