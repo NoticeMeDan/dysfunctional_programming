@@ -318,13 +318,6 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
     let handSize = state.hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
     let emptyPlaces (coord:coord) moveX moveY = emptyPlaces coord state.lettersPlaced board moveX moveY handSize radius
     
-    // board size
-    let center = ScrabbleUtil.Board.center board
-    let minX = fst center - radius
-    let maxX = fst center + radius
-    let minY = snd center - radius
-    let maxY = snd center + radius
-
     let occupiedTiles : coord list =
         let letters = Map.toList state.lettersPlaced;
         let rec tileLocationsRec tail = 
@@ -336,10 +329,11 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
     // map to tile with most empty places for each string
     let mapCharToBestTile =
         occupiedTiles
-        |> List.map (fun coord -> 
-            let freeSpacesX = emptyPlaces coord 1 0
-            let freeSpacesY = emptyPlaces coord 0 1
-            (coord, freeSpacesX, freeSpacesY)
+        |> List.map (
+                fun coord -> 
+                let freeSpacesX = emptyPlaces coord 1 0
+                let freeSpacesY = emptyPlaces coord 0 1
+                (coord, freeSpacesX, freeSpacesY)
             )
         |> List.filter (fun (coord, freeSpacesX, freeSpacesY) -> freeSpacesX > 0 || freeSpacesY > 0)
         |> List.map
