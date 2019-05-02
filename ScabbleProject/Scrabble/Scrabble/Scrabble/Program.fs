@@ -441,15 +441,6 @@ let makeMove (board:ScrabbleUtil.board) pieces (state : State.state) radius (dic
     | None -> placeOnEmptyBoard (board.center) pieces state state.hand dict
     | Some _ -> PlaceOnNonEmptyBoard board pieces state radius state.hand dict
 
-let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
-    // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
-    //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
-    match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
-    | None, Some (' ', map) ->      
-        placeOnEmptyBoard (board.center) pieces st hand dict
-    | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces (st : State.state) radius hand dict
-
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
