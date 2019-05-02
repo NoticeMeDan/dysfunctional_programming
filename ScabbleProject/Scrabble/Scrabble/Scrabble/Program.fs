@@ -354,20 +354,17 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius placed hand (
     let minY = snd center - radius
     let maxY = snd center + radius
 
-    // AI
-    let occupiedTileLocations = [
-            for y in [minY..maxY] do
-                for x in [minX..maxX] do
-                    if (isTileEmpty (x,y))
-                        then ()
-                        else yield (x,y)
-         ]
-    
-    //let tileLocations = [ for (KeyValue(v, _)) in state.lettersPlaced -> v ]
-    
+    let occupiedTiles : coord list =
+        let letters = Map.toList state.lettersPlaced;
+        let rec tileLocationsRec tail = 
+            match tail with
+            | [] -> []
+            | (x : coord, y)::xx -> x::tileLocationsRec(xx)
+        tileLocationsRec (letters)
+            
     // map to tile with most empty places for each string
     let mapCharToBestTile =
-        occupiedTileLocations
+        occupiedTiles
         |> List.map (fun (x,y) -> 
             let placesX = emptyPlaces (x,y) 1 0
             let placesY = emptyPlaces (x,y) 0 1
