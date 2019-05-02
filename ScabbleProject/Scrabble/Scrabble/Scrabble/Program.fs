@@ -122,7 +122,7 @@ module CalculatePoints =
 
 // TODO
 let rec makeCombinations (lst ) =
-    let givenLenghtOflst = List.length lst
+    let givenLenghtOflst = List.length lst-1
     
     let rec innerFunc currentWord index map=
         if List.length currentWord < givenLenghtOflst then
@@ -300,21 +300,21 @@ let charOnTile (x,y) placed board=
     | _, None -> ' '
 
 // TODO
-let isTileEmpty (x,y) placed board =
+let isTileEmpty (x,y) placed board boardRadius =
     let c = charOnTile (x,y) placed board
-    (' ' = c ) || (System.Char.IsLower c)
+    ((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1 
 
 // TODO
-let emptyPlaces (x,y) placed board moveX moveY handSize =
+let emptyPlaces (x,y) placed board moveX moveY handSize boardRadius =
     let handSize = int handSize
     let rec innerFn (x,y) value =
         if (value < handSize)
         then
             let newCoords = (x + moveX, y + moveY)
-            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board
-            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board
+            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board boardRadius
+            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board boardRadius
             let neighborIsOkay = neighborCheck1 && neighborCheck2
-            match isTileEmpty newCoords placed board , neighborIsOkay with
+            match isTileEmpty newCoords placed board boardRadius, neighborIsOkay with
             | true, true ->  (innerFn newCoords (value + 1))
             | false, _ -> value-1
             | true, false -> value
@@ -328,9 +328,9 @@ let emptyLeft (x,y) placed board = isTileEmpty (x-1,y) placed board
 let emptyAbove (x,y) placed board = isTileEmpty (x,y-1) placed board
 
 // TODO
-let wordAdjacentToTile (x,y) placed board moveX moveY =
+let wordAdjacentToTile (x,y) placed board moveX moveY radius =
     let rec innerFn (x,y) value =
-        if (isTileEmpty (x,y) placed board ) then value
+        if (isTileEmpty (x,y) placed board radius) then value
         else 
             let newCoords = (x + moveX, y + moveY)
             let charOnTile = charOnTile (x,y) placed board
@@ -338,16 +338,16 @@ let wordAdjacentToTile (x,y) placed board moveX moveY =
     innerFn (x,y) []
 
 // TODO
-let theTwoWordsAdjacentToTile (x,y) placed board =
-    wordAdjacentToTile (x,y) placed board -1 0, wordAdjacentToTile (x,y) placed board 0 -1
+let theTwoWordsAdjacentToTile (x,y) placed board radius =
+    wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
 let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // helperMethods
-    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board
+    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
     let charOnTile (x,y) = charOnTile (x,y) placed board
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize
+    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize radius
     
     // board size
     let c = ScrabbleUtil.Board.center board
@@ -376,7 +376,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         |> List.filter (fun ((x,y), placesX, placesY) -> placesX > 0 || placesY > 0)
         |> List.map
             (fun ((x,y), placesX, placesY) ->
-                (theTwoWordsAdjacentToTile (x,y) placed board, ((x,y), placesX, placesY)))
+                (theTwoWordsAdjacentToTile (x,y) placed board radius, ((x,y), placesX, placesY)))
         |> List.fold
             (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
                 let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
@@ -421,7 +421,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
 
     // TODO
     match listBestChar with
-    | [] -> SMPass
+    | [] -> SMForfeit
     | (char, (sum, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find char mapCharToBestTile
 
@@ -456,18 +456,17 @@ let playGame cstream board pieces (st : State.state) words =
         
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
-        printfn "\n\n"
-        Print.printHand pieces (State.hand st)
+        //Print.printHand pieces (State.hand st)
 
-        printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
-        let input =  System.Console.ReadLine()
-        printf "Word: %A -> %A\n" input (lookup input)
-        let move =
+        //printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
+        //let input =  System.Console.ReadLine()
+        //printf "Word: %A -> %A\n" input (lookup input)
+        let move = AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+        (*
             match input with
             | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
-            | "PASS" -> SMPass
-            //| "NEW_HAND" -> SMChange
-
+            | "PASS" -> SMPass*)
+            
         printfn "Trying to play: %A" move
         send cstream (move)
         let msg = recv cstream
