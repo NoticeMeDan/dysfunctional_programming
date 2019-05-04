@@ -28,7 +28,6 @@ module RegEx =
 
  // From Jesper.
  module Print =
-    // Jesper
     let printBoard board radius placed =
         let c = ScrabbleUtil.Board.center board
 
@@ -87,7 +86,7 @@ module State =
         overwriteHand st hand'
 
 // TODO
-let rec makeCombinations (lst ) =
+let rec makeCombinations lst =
     let givenLenghtOflst = List.length lst-1
     
     let rec innerFunc currentWord index map=
@@ -126,7 +125,7 @@ let convertToListOfStrings (lst : Set<char*int> list list) =
 let rec sumOfWord word =
     match word with 
     | [] -> 0
-    | (index, set)::xt -> (snd (set |>Set.toList).[0]) + (sumOfWord xt) 
+    | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (sumOfWord xt) 
 
 // TODO
 let createMove word startPos goX goY =
@@ -247,7 +246,7 @@ let placeOnEmptyBoard center pieces (st : State.state) hand dict =
     |> createMoveFromListOfWords center 1 0
 
 // TODO
-let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictionary.Dictionary)= 
+let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict: Dictionary.Dictionary) = 
     let mapCharToIndexes = reversePiecesMap pieces hand
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
     let filteredWords =
@@ -255,11 +254,14 @@ let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict:Dictio
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
     convertStringToPiece filteredWords mapCharToIndexes pieces
-    |> List.map (fun x -> (sumOfWord x, x))
+    |> List.map (fun x -> async { return sumOfWord x, x })
+    |> Async.Parallel
+    |> Async.RunSynchronously
+    |> Array.toList
     |> List.sortByDescending (fun (sum, x) -> sum)
 
 // TODO
-let charOnTile (x,y) placed board=
+let charOnTile (x,y) placed board =
     match Map.tryFind (x, y) placed, ScrabbleUtil.Board.tiles board (x, y) with
     | None, Some (c, _) -> c
     | Some (c, _), _    -> c
