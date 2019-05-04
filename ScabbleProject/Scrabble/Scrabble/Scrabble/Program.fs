@@ -362,14 +362,6 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
             )
             Map.empty
     
-// todos:
-// place letter in the middle of a word - see comment at the line 408
-// singleletter score, double, etc
-
-// mapCharToBestTile should go from type map<char list, (int*int)*int*int) to map<char list, (int*int)*(int*int)*(int*int))
-// listBestChar should go from type 'a list  to ('a * 'a ) list
-// bestExtendingWord shuld be refractored
-
     // TODO
     let listBestChar =
         mapCharToBestTile
@@ -420,18 +412,10 @@ let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
         
     let rec aux (st : State.state) =
+        
         Print.printBoard board 8 (State.lettersPlaced st)
-        //Print.printHand pieces (State.hand st)
-
-        //printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
-        //let input =  System.Console.ReadLine()
-        //printf "Word: %A -> %A\n" input (lookup input)
         let move = AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
-        (*
-            match input with
-            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
-            | "PASS" -> SMPass*)
-            
+
         printfn "Trying to play: %A" move
         send cstream (move)
         let msg = recv cstream
