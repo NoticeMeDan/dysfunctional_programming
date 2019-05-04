@@ -65,23 +65,23 @@ module State =
     
     // Add placed pieces to the local board state and return the updated state
     // TODO
-    let addPlacedPiecesToBoard (pcs:piecePlaced list) (st:state) =
+    let addPlacedPiecesToBoard (pcs:piecePlaced list) (state:state) =
         let lettersPlaced' =
             List.fold (fun lettersPlaced (coord, (_, piece)) ->
-                Map.add coord piece lettersPlaced) st.lettersPlaced pcs
-        overwriteLetters st lettersPlaced'
+                Map.add coord piece lettersPlaced) state.lettersPlaced pcs
+        overwriteLetters state lettersPlaced'
     
     // Add pieces to hand and return the updated state
     // TODO
-    let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
-        let newHand = List.fold (fun acc (id, x) -> MultiSet.add id x acc) st.hand pcs
-        overwriteHand st newHand
+    let addPiecesToHand (pcs:(uint32*uint32) list) (state:state) =
+        let newHand = List.fold (fun acc (id, x) -> MultiSet.add id x acc) state.hand pcs
+        overwriteHand state newHand
         
     // Remove pieces from hand, given a list of moves played, and return the updated state
     // TODO
-    let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
-        let newHand = List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) st.hand usedPiecesList
-        overwriteHand st newHand
+    let removePiecesFromHand (usedPiecesList:piecePlaced list) state =
+        let newHand = List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) state.hand usedPiecesList
+        overwriteHand state newHand
         
     let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
         let newHand = List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
@@ -214,18 +214,19 @@ let convertStringToPiece words mapCharToIndexes pieces =
     |> List.map (fun (x, map) -> x)
 
 // TODO. Gave dictionary as argument
-let filterWords (st : State.state) words dictionary = 
+let filterWords (state : State.state) words dictionary = 
     words
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
 // TODO. Gave dictionary as argument
-let placeOnEmptyBoard center pieces (st : State.state) hand dict = 
+let placeOnEmptyBoard center pieces (state : State.state) dict =
+    let hand = state.hand
     let mapCharToIndexes = mapPiecesToIndexes pieces hand
     printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand hand pieces
-    let filteredWords = filterWords st words dict 
+    let filteredWords = filterWords state words dict 
     printfn "filteredWords: %A" filteredWords
     
     let describedWords =
@@ -236,10 +237,10 @@ let placeOnEmptyBoard center pieces (st : State.state) hand dict =
     |> createMoveFromListOfWords center 1 0
 
 // TODO
-let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict: Dictionary.Dictionary) = 
+let bestExtendingWord pieces (state : State.state) hand charLst lenght (dict: Dictionary.Dictionary) = 
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
     let filteredWords =
-        filterWords st words dict
+        filterWords state words dict
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
     convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
@@ -305,11 +306,13 @@ let theTwoWordsAdjacentToTile (x,y) placed board radius =
     wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
-let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
+let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
+    let placed = state.lettersPlaced
+    let hand = state.hand
     // helperMethods
     let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlacesInDirection (x,y) st board moveX moveY radius
+    let emptyPlaces (x,y) moveX moveY = emptyPlacesInDirection (x,y) state board moveX moveY radius
     
     // board size
     let c = ScrabbleUtil.Board.center board
@@ -370,7 +373,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         mapCharToBestTile
         |> Map.toList
         |> List.map (fun (charLst, (_,  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
+            let words = bestExtendingWord pieces state hand charLst (max placesX placesY) dict
             let word =
                 match words with
                 | [] -> None
@@ -397,21 +400,23 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         createMove word (x,y) distanceX distanceY
 
 // TODO
-let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
+let AIDecideMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
+    let placed = state.lettersPlaced
+    let hand = state.hand
     // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
     match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', _) ->      
-        placeOnEmptyBoard (board.center) pieces st hand dict
+        placeOnEmptyBoard (board.center) pieces state dict
     | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand dict
+        PlaceOnNonEmptyBoard board pieces state radius dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
 // From Jesper. But adjusted just handle other input and works with a Dictionary
-let playGame cstream board pieces (st : State.state) words =
+let playGame cstream board pieces (state : State.state) words =
     let dict = createDictionary words
         
     let rec aux (state : State.state) =
@@ -424,7 +429,7 @@ let playGame cstream board pieces (st : State.state) words =
             then
                 SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
             else
-                AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
+                AIDecideMove board pieces state 8 dict
             
         printfn "Trying to play: %A" move
         send cstream (move)
@@ -463,7 +468,7 @@ let playGame cstream board pieces (st : State.state) words =
         | RErr err -> printfn "Server Error:\n%A" err; aux state
         | RGPE err -> printfn "Gameplay Error:\n%A" err; aux state
 
-    aux st
+    aux state
 
 // From Jesper
 let setupGame cstream board words =
