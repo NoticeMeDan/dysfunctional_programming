@@ -55,15 +55,11 @@ module State =
     
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     
-    let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
-
-    let newState hand = makeState Map.empty hand
-
+    let mkState lp hand pieces = { lettersPlaced = lp; hand = hand; pieces = pieces }
+    let newState hand = mkState Map.empty hand
     let lettersPlaced state = state.lettersPlaced
-    
-    let overwriteHand state newHand = makeState state.lettersPlaced newHand state.pieces
-    
-    let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
+    let overwriteLetters state newLettersPlace = mkState newLettersPlace state.hand state.pieces
+    let overwriteHand state newHand = mkState state.lettersPlaced newHand state.pieces
     
     // Add placed pieces to the local board state and return the updated state
     // TODO
@@ -71,25 +67,29 @@ module State =
         let lettersPlaced' =
             List.fold (fun lettersPlaced (coord, (_, piece)) ->
                 Map.add coord piece lettersPlaced) st.lettersPlaced pcs
-        overwriteLettersPlaced st lettersPlaced'
+        overwriteLetters st lettersPlaced'
     
     // Add pieces to hand and return the updated state
     // TODO
     let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
-        let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
-        overwriteHand st hand'
+        let newHand = List.fold (fun acc (id, x) -> MultiSet.add id x acc) st.hand pcs
+        overwriteHand st newHand
         
     // Remove pieces from hand, given a list of moves played, and return the updated state
     // TODO
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
-        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
-        overwriteHand st hand'
+        let newHand = List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) st.hand usedPiecesList
+        overwriteHand st newHand
+        
+    let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
+        let newHand = List.fold (fun acc (id, _) -> MultiSet.removeSingle id acc) state.hand pieces
+        overwriteHand state newHand
 
 // TODO
 let rec makeCombinations lst =
     let givenLenghtOflst = List.length lst-1
     
-    let rec innerFunc currentWord index map=
+    let rec innerFunc currentWord index map =
         if List.length currentWord < givenLenghtOflst then
             let nextCurrentWord = currentWord @ [lst.[index]]
             let newMap = map |> Map.add index index 
@@ -419,18 +419,10 @@ let createDictionary words =
 let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
         
-    let rec aux (st : State.state) =
-        Print.printBoard board 8 (State.lettersPlaced st)
-        //Print.printHand pieces (State.hand st)
+    let rec aux (state : State.state) =
+        Print.printBoard board 8 (State.lettersPlaced state)
 
-        //printfn "Input move (format '(<x-coordinate><y-coordinate> <piece id><character><point-value> )*', note the absence of state between the last inputs)"
-        //let input =  System.Console.ReadLine()
-        //printf "Word: %A -> %A\n" input (lookup input)
-        let move = AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
-        (*
-            match input with
-            | "AI" -> AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
-            | "PASS" -> SMPass*)
+        let move = AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
             
         printfn "Trying to play: %A" move
         send cstream (move)
@@ -442,23 +434,27 @@ let playGame cstream board pieces (st : State.state) words =
             printfn "points: %A" points
             printfn "new pieces %A" newPieces
             
-            let st' = st |> (State.addPlacedPiecesToBoard moves
+            let newState = state |> (State.addPlacedPiecesToBoard moves
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
-            aux st'
+            aux newState
+        | RCM (CMChangeSuccess (newPieces)) ->
+            (* Successful piece swap, update state *)
+            printfn "Success. You swapped a piece."
+            printfn "New piece(s): %A" newPieces
         | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
-            let st' = st |> State.addPlacedPiecesToBoard moves
-            aux st'
+            let newState = state |> State.addPlacedPiecesToBoard moves
+            aux newState
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
-            let st' = st // This state needs to be updated
-            aux st'
+            let newState = state // This state needs to be updated
+            aux newState
         | RCM (CMGameOver _) -> ()
         | RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RErr err -> printfn "Server Error:\n%A" err; aux st
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
+        | RErr err -> printfn "Server Error:\n%A" err; aux state
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux state
 
     aux st
 
