@@ -55,15 +55,11 @@ module State =
     
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     
-    let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
-
-    let newState hand = makeState Map.empty hand
-
+    let mkState lp hand pieces = { lettersPlaced = lp; hand = hand; pieces = pieces }
+    let newState hand = mkState Map.empty hand
     let lettersPlaced state = state.lettersPlaced
-    
-    let overwriteHand state newHand = makeState state.lettersPlaced newHand state.pieces
-    
-    let overwriteLettersPlaced state newLettersPlace = makeState newLettersPlace state.hand state.pieces
+    let overwriteLetters state newLettersPlace = mkState newLettersPlace state.hand state.pieces
+    let overwriteHand state newHand = mkState state.lettersPlaced newHand state.pieces
     
     // Add placed pieces to the local board state and return the updated state
     // TODO
@@ -71,25 +67,29 @@ module State =
         let lettersPlaced' =
             List.fold (fun lettersPlaced (coord, (_, piece)) ->
                 Map.add coord piece lettersPlaced) st.lettersPlaced pcs
-        overwriteLettersPlaced st lettersPlaced'
+        overwriteLetters st lettersPlaced'
     
     // Add pieces to hand and return the updated state
     // TODO
     let addPiecesToHand (pcs:(uint32*uint32) list) (st:state) =
-        let hand' = List.fold (fun acc (pid, x) -> MultiSet.add pid x acc) st.hand pcs
-        overwriteHand st hand'
+        let newHand = List.fold (fun acc (id, x) -> MultiSet.add id x acc) st.hand pcs
+        overwriteHand st newHand
         
     // Remove pieces from hand, given a list of moves played, and return the updated state
     // TODO
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
-        let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
-        overwriteHand st hand'
+        let newHand = List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) st.hand usedPiecesList
+        overwriteHand st newHand
+        
+    let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
+        let newHand = List.fold (fun acc (id, _) -> MultiSet.removeSingle id acc) state.hand pieces
+        overwriteHand state newHand
 
 // TODO
 let rec makeCombinations lst =
     let givenLenghtOflst = List.length lst-1
     
-    let rec innerFunc currentWord index map=
+    let rec innerFunc currentWord index map =
         if List.length currentWord < givenLenghtOflst then
             let nextCurrentWord = currentWord @ [lst.[index]]
             let newMap = map |> Map.add index index 
@@ -306,7 +306,7 @@ let wordAdjacentToTile (x,y) placed board moveX moveY radius =
     innerFn (x,y) []
 
 // TODO
-let theTwoWordsAdjacentToTile (x,y) placed board radius =
+let findNeighbouringWords (x,y) placed board radius =
     wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
@@ -324,66 +324,74 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
     let maxY = snd c + radius
 
     // AI
-    let occupiedTileLocations = [
+    let findOccupiedTiles = [
             for y in [minY..maxY] do
                 for x in [minX..maxX] do
                     if (isTileEmpty (x,y))
                         then ()
                         else yield (x,y)
          ]   
-
-    // map to tile with most empty places for each string
-    let mapCharToBestTile =
-        occupiedTileLocations
-        |> List.map (fun (x,y) -> 
-            let placesX = emptyPlaces (x,y) 1 0
-            let placesY = emptyPlaces (x,y) 0 1
-            ((x,y), placesX, placesY)
-            )
-        |> List.filter (fun ((x,y), placesX, placesY) -> placesX > 0 || placesY > 0)
-        |> List.map
-            (fun ((x,y), placesX, placesY) ->
-                (theTwoWordsAdjacentToTile (x,y) placed board radius, ((x,y), placesX, placesY)))
-        |> List.fold
-            (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
-                let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
-                
-                let updateMap string _placesX _placesY acc = 
-                    if _placesX = -1 && _placesY = -1 then acc
-                    else 
-                        let tilesPlaces = max placesX placesY
-                        match Map.tryFind string acc with
-                        | None -> acc |> addTo string _placesX _placesY
-                        | Some (_, plx, ply) -> if (max plx ply) < tilesPlaces then acc |> addTo string _placesX _placesY else acc
-
-                if stringX = stringY
-                then  acc |> updateMap stringX placesX placesY
-                else  acc |> updateMap stringX placesX -1 |> updateMap stringY -1 placesY  
-            )
-            Map.empty
     
-    // TODO
-    let listBestChar =
-        mapCharToBestTile
-        |> Map.toList
-        |> List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
+    let mapEmptyPlaces list =
+        List.map (fun (x,y) -> 
+            let xs = emptyPlaces (x,y) 1 0
+            let ys = emptyPlaces (x,y) 0 1
+            ((x,y), xs, ys)) list
+    
+    let mapNeighbouringWords list =
+        List.map (fun ((x,y), placesX, placesY) ->
+            (findNeighbouringWords (x,y) placed board radius, ((x,y), placesX, placesY))) list
+    
+    let update list =
+        List.fold (fun map ((stringX, stringY), ((x,y), spaceX, spaceY)) ->
+                let append string xs ys acc = Map.add string ((x,y), xs, ys) acc   
+                let updateMap string horizontalSpace verticalSpace map =
+                    match (horizontalSpace,verticalSpace) with
+                    | (-1,-1) -> map
+                    | _ ->
+                        let maxSpace = max spaceX spaceY
+                        match Map.tryFind string map with
+                        | None -> map |> append string horizontalSpace verticalSpace
+                        | Some (_, xs, ys) -> 
+                            if (max xs ys) < maxSpace
+                            then map |> append string horizontalSpace verticalSpace
+                            else map
+            
+                if stringX = stringY
+                then  map |> updateMap stringX spaceX spaceY
+                else  map |> updateMap stringX spaceX -1 |> updateMap stringY -1 spaceY  
+            )
+            Map.empty list
+            
+    // map to tile with most empty places for each string
+    let mapWordToTiles =
+        findOccupiedTiles
+        |> mapEmptyPlaces
+        |> mapNeighbouringWords
+        |> update
+    
+    let findBestWords list =
+        List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
             let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
-            let word =
+            let fstWord =
                 match words with
                 | [] -> None
-                | xh::xt -> Some xh
-            (charLst, word)
-            )
-        |> List.filter (fun (c, word) -> match word with | None -> false | Some _ -> true)
-        |> List.map (fun (c, word) -> (c, word.Value))
-        |> List.sortBy (fun (c, (sum, word)) -> sum)
+                | fst::rst -> Some fst
+            (charLst, fstWord)
+            ) list
+        
+    let findPlayableMoves =
+        Map.toList mapWordToTiles
+        |> findBestWords
+        |> List.filter (fun ( _ , word) -> match word with | None -> false | Some _ -> true)
+        |> List.map (fun (charLst, word) -> (charLst, word.Value))
+        |> List.sortBy (fun (charLst, (sum, word)) -> sum)
 
-    // TODO
-    match listBestChar with
+    match findPlayableMoves with
     | [] -> SMForfeit
-    | (char, (sum, word))::_ -> 
-        let ((x,y), placesX, placesY) = Map.find char mapCharToBestTile
-
+    | (charLst, (sum, word))::_ -> 
+        let ((x,y), placesX, placesY) = Map.find charLst mapWordToTiles
+        
         let distanceX, distanceY =
             if placesX >= placesY then (1,0)
             else (0,1)
@@ -411,11 +419,11 @@ let createDictionary words =
 let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
         
-    let rec aux (st : State.state) =
-        
-        Print.printBoard board 8 (State.lettersPlaced st)
-        let move = AIDecideMove board pieces st 8  (State.lettersPlaced st) st.hand dict
+    let rec aux (state : State.state) =
+        Print.printBoard board 8 (State.lettersPlaced state)
 
+        let move = AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
+            
         printfn "Trying to play: %A" move
         send cstream (move)
         let msg = recv cstream
@@ -426,23 +434,27 @@ let playGame cstream board pieces (st : State.state) words =
             printfn "points: %A" points
             printfn "new pieces %A" newPieces
             
-            let st' = st |> (State.addPlacedPiecesToBoard moves
+            let newState = state |> (State.addPlacedPiecesToBoard moves
                          >> State.removePiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
-            aux st'
+            aux newState
+        | RCM (CMChangeSuccess (newPieces)) ->
+            (* Successful piece swap, update state *)
+            printfn "Success. You swapped a piece."
+            printfn "New piece(s): %A" newPieces
         | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
-            let st' = st |> State.addPlacedPiecesToBoard moves
-            aux st'
+            let newState = state |> State.addPlacedPiecesToBoard moves
+            aux newState
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
-            let st' = st // This state needs to be updated
-            aux st'
+            let newState = state // This state needs to be updated
+            aux newState
         | RCM (CMGameOver _) -> ()
         | RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RErr err -> printfn "Server Error:\n%A" err; aux st
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
+        | RErr err -> printfn "Server Error:\n%A" err; aux state
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux state
 
     aux st
 
