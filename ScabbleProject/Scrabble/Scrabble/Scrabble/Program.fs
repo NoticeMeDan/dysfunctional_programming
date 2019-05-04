@@ -29,11 +29,6 @@ module RegEx =
  // From Jesper.
  module Print =
     // Jesper
-    let printHand pieces hand =
-        hand |>
-        MultiSet.fold (fun _ x i -> printfn "%d -> (%A, %d)" x (Map.find x pieces) i) ()
-    
-    // Jesper
     let printBoard board radius placed =
         let c = ScrabbleUtil.Board.center board
 
@@ -49,12 +44,6 @@ module RegEx =
                 | Some (c, _), _    -> printf "%c " c
                 | _, None -> printf "# "
             printf "\n"
-    
-    // TODO
-    let printPoints points names =
-        points
-        |> Map.toList
-        |> List.iter(fun (k,v) ->  printfn "player %A have points: %A" (Map.find k names) v )
 
 module State = 
     type state = {
@@ -67,16 +56,11 @@ module State =
     
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     
-    let singleLetterScore : tile = ('a', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 10) Map.empty)
-    let doubleLetterScore : tile = ('c', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 2) Map.empty)
-    let trippleLetterScore : tile = ('b', Map.add 0u (fun i cs p -> p + (cs.[int i] |> snd) * 3) Map.empty)
-    
     let makeState lettersPlaced hand pieces = { lettersPlaced = lettersPlaced; hand = hand; pieces = pieces }
 
     let newState hand = makeState Map.empty hand
 
     let lettersPlaced state = state.lettersPlaced
-    let hand state          = state.hand
     
     let overwriteHand state newHand = makeState state.lettersPlaced newHand state.pieces
     
@@ -101,24 +85,6 @@ module State =
     let removePiecesFromHand (usedPiecesList:piecePlaced list) st =
         let hand' = List.fold (fun acc (_, (pid, _)) -> MultiSet.removeSingle pid acc) st.hand usedPiecesList
         overwriteHand st hand'
-
-module CalculatePoints =
-    let calculatePoints (tiles: tile list) (words: (char * int) array) =
-        let pset =
-            tiles |> List.fold
-                         (fun acc tile -> Map.fold (fun mapAcc key value -> Set.add key mapAcc) acc (snd tile))
-                         Set.empty<uint32>
-
-        let get tile p pos =
-           match Map.tryFind p (snd tile) with
-           | None -> id
-           | Some f -> f pos words
-
-        let processor p = tiles |> List.fold (fun (f, i) t ->  ((get t p i) :: f, i + 1u)) ([], 0u) |> fst
-        let fl = Set.foldBack (fun ks s -> (processor ks) @ s) pset []
-        let compute = fl |> List.fold (>>) id
-
-        compute 0
 
 // TODO
 let rec makeCombinations (lst ) =
@@ -345,7 +311,6 @@ let theTwoWordsAdjacentToTile (x,y) placed board radius =
 let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dict:Dictionary.Dictionary)=
     // helperMethods
     let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
-    let charOnTile (x,y) = charOnTile (x,y) placed board
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
     let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize radius
     
@@ -451,8 +416,6 @@ let createDictionary words =
 // From Jesper. But adjusted just handle other input and works with a Dictionary
 let playGame cstream board pieces (st : State.state) words =
     let dict = createDictionary words
-    let lookup word =
-        Dictionary.lookup word dict
         
     let rec aux (st : State.state) =
         Print.printBoard board 8 (State.lettersPlaced st)
@@ -498,13 +461,13 @@ let playGame cstream board pieces (st : State.state) words =
     aux st
 
 // From Jesper
-let setupGame cstream board alphabet words handSize timeout =
+let setupGame cstream board words =
     let rec aux () =
         match ServerCommunication.recv cstream with
         | RCM (CMPlayerJoined name) ->
             printfn "Player %s joined" name
             aux ()
-        | RCM (CMGameStarted (playerNumber, hand, firstPlayer, pieces, players)) as msg ->
+        | RCM (CMGameStarted (_, hand, _, pieces, _)) as msg ->
             printfn "Game started %A" msg
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
             playGame cstream board pieces (State.newState handSet pieces) words
@@ -520,8 +483,8 @@ let joinGame port gameId password playerName =
         send cstream (SMJoinGame (gameId, password, playerName))
 
         match ServerCommunication.recv cstream with
-            | RCM (CMJoinSuccess(board, numberOfPlayers, alphabet, words, handSize, timeout)) -> 
-                setupGame cstream board alphabet words handSize timeout 
+            | RCM (CMJoinSuccess(board, _, _, words, _, _)) -> 
+                setupGame cstream board words
             | msg -> failwith (sprintf "Error joining game%A" msg)
     }
 
@@ -529,32 +492,32 @@ let joinGame port gameId password playerName =
 let startGame port numberOfPlayers = 
     async {
         let client = new TcpClient(sprintf "%A" (localIP ()), port)
-        let cstream = client.GetStream()
         let path = "../../../EnglishDictionary.txt"
-        let words = File.ReadLines path |> Seq.toList
+        let cstream = client.GetStream()
         let board = StandardBoard.mkStandardBoard ()
+        let words = File.ReadLines path |> Seq.toList
         let pieces = English.pieces()
-        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        let handSize = 7u
-        let timeout = None
         let seed = None
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        let timeout = None
+        let sizeOfHand = 7u
 
-        send cstream (SMStartGame (numberOfPlayers, "My game", "password", "My name", seed, board, pieces,
-                                    handSize, alphabet, words, timeout))
+        send cstream (SMStartGame (numberOfPlayers, "game", "password", "NoticeMeDan", seed, board, pieces,
+                                    sizeOfHand, alphabet, words, timeout))
 
         let gameId =
             match ServerCommunication.recv cstream with
             | RCM (CMGameInit gameId) -> gameId
             | msg -> failwith (sprintf "Error initialising game, server sent other message than CMGameInit (should not happen)\n%A" msg)
             
-        do! (async { setupGame cstream board alphabet words handSize timeout } ::
+        do! (async { setupGame cstream board words } ::
              [for i in 2u..numberOfPlayers do yield joinGame port gameId "password" ("Player" + (string i))] |>
              Async.Parallel |> Async.Ignore)
     }
 
 // From Jesper
 [<EntryPoint>]
-let main argv =
+let main _ =
     [Comm.startServer 13000; startGame 13000 1u] |>
     Async.Parallel |>
     Async.RunSynchronously |> ignore
