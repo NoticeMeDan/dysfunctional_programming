@@ -1,5 +1,7 @@
 open System.IO
 
+open System
+open MultiSet
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
@@ -427,7 +429,7 @@ let playGame cstream board pieces (st : State.state) words =
         let move =
             if hasWildcard
             then
-                SMChange ([0u])
+                SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
             else
                 AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
             
@@ -481,7 +483,6 @@ let setupGame cstream board words =
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
             playGame cstream board pieces (State.newState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
-        
     aux ()
 
 // From Jesper
