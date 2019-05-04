@@ -401,7 +401,7 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
         createMove word coord distanceX distanceY
 
 // TODO
-let AIDecideMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
+let AIMakeMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     let placed = state.lettersPlaced
     let hand = state.hand
     // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
@@ -430,7 +430,7 @@ let playGame cstream board pieces (state : State.state) words =
             then
                 SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
             else
-                AIDecideMove board pieces state 8 dict
+                AIMakeMove board pieces state 8 dict
             
         printfn "Trying to play: %A" move
         send cstream (move)
