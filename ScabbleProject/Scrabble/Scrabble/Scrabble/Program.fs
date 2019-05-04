@@ -87,23 +87,24 @@ module State =
         let newHand = List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
         overwriteHand state newHand
 
-// TODO
-let rec makeCombinations lst =
-    let givenLenghtOflst = List.length lst-1
+let rec createAnagram list=
+    let lengthOfList = List.length list-1
+    let array = [0 .. (lengthOfList - 1)]
     
-    let rec innerFunc currentWord index map =
-        if List.length currentWord < givenLenghtOflst then
-            let nextCurrentWord = currentWord @ [lst.[index]]
+    let rec anagram wordArray index map =
+        if List.length wordArray < lengthOfList then
+            let nextWord = wordArray @ [list.[index]]
             let newMap = map |> Map.add index index 
-            [0 .. (givenLenghtOflst-1)]
-            |> List.fold (fun acc value ->
+            
+            array |> List.fold (fun acc value ->
                 match Map.tryFind value newMap with
-                | None -> (innerFunc nextCurrentWord value newMap) @ acc
+                | None -> (anagram nextWord value newMap) @ acc
                 | Some _ -> acc
-                ) [nextCurrentWord]
+                ) [nextWord]
         else []
 
-    [0 .. (givenLenghtOflst-1)] |> List.fold (fun acc value -> (innerFunc [] value Map.empty)@acc) []
+    array |> List.fold (fun acc value -> (anagram [] value Map.empty)@acc) []
+    
 // TODO
 let charListToString (cl:char list) = List.foldBack (fun x acc -> x.ToString() + acc) cl ""
 
@@ -173,7 +174,7 @@ let createWordCombinationsInHand hand pieces=
             |> List.fold (fun acc2 _ ->
                 acc2 @ [Map.find index pieces]) acc)
         []
-    |> makeCombinations
+    |> createAnagram
     |> convertToListOfStrings
 
 // TODO
@@ -185,7 +186,7 @@ let createWordCombinationsInHandFromStartChar hand pieces startCharLst length=
             |> List.fold (fun acc2 _ ->
                 acc2 @ [Map.find index pieces]) acc)
         []
-    |> makeCombinations
+    |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
     |> List.map (fun string -> (startCharLst |> charListToString) + string)
