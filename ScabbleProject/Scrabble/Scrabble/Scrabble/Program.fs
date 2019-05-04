@@ -301,7 +301,7 @@ let wordAdjacentToTile (x,y) placed board moveX moveY radius =
     innerFn (x,y) []
 
 // TODO
-let theTwoWordsAdjacentToTile (x,y) placed board radius =
+let findNeighbouringWords (x,y) placed board radius =
     wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
@@ -319,74 +319,74 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
     let maxY = snd c + radius
 
     // AI
-    let occupiedTileLocations = [
-            for y in [minY..maxY] do
-                for x in [minX..maxX] do
-                    if (isTileEmpty (x,y))
-                        then ()
-                        else yield (x,y)
-         ]   
-
-    // map to tile with most empty places for each string
-    let mapCharToBestTile =
-        occupiedTileLocations
-        |> List.map (fun (x,y) -> 
-            let placesX = emptyPlaces (x,y) 1 0
-            let placesY = emptyPlaces (x,y) 0 1
-            ((x,y), placesX, placesY)
-            )
-        |> List.filter (fun ((x,y), placesX, placesY) -> placesX > 0 || placesY > 0)
-        |> List.map
-            (fun ((x,y), placesX, placesY) ->
-                (theTwoWordsAdjacentToTile (x,y) placed board radius, ((x,y), placesX, placesY)))
-        |> List.fold
-            (fun acc ((stringX, stringY), ((x,y), placesX, placesY)) ->
-                let addTo string placesX placesY acc = Map.add string ((x,y), placesX, placesY) acc
-                
-                let updateMap string _placesX _placesY acc = 
-                    if _placesX = -1 && _placesY = -1 then acc
-                    else 
-                        let tilesPlaces = max placesX placesY
-                        match Map.tryFind string acc with
-                        | None -> acc |> addTo string _placesX _placesY
-                        | Some (_, plx, ply) -> if (max plx ply) < tilesPlaces then acc |> addTo string _placesX _placesY else acc
-
-                if stringX = stringY
-                then  acc |> updateMap stringX placesX placesY
-                else  acc |> updateMap stringX placesX -1 |> updateMap stringY -1 placesY  
-            )
-            Map.empty
+    let findOccupiedTiles : coord list =
+        let letters = Map.toList st.lettersPlaced;
+        let rec tileLocationsRec tail = 
+            match tail with
+            | [] -> []
+            | (x : coord, y)::xx -> x::tileLocationsRec(xx)
+        tileLocationsRec (letters)   
     
-// todos:
-// place letter in the middle of a word - see comment at the line 408
-// singleletter score, double, etc
-
-// mapCharToBestTile should go from type map<char list, (int*int)*int*int) to map<char list, (int*int)*(int*int)*(int*int))
-// listBestChar should go from type 'a list  to ('a * 'a ) list
-// bestExtendingWord shuld be refractored
-
-    // TODO
-    let listBestChar =
-        mapCharToBestTile
-        |> Map.toList
-        |> List.map (fun (charLst, (_,  placesX, placesY)) -> 
+    let mapEmptyPlaces list =
+        List.map (fun (x,y) -> 
+            let xs = emptyPlaces (x,y) 1 0
+            let ys = emptyPlaces (x,y) 0 1
+            ((x,y), xs, ys)) list
+    
+    let mapNeighbouringWords list =
+        List.map (fun ((x,y), placesX, placesY) ->
+            (findNeighbouringWords (x,y) placed board radius, ((x,y), placesX, placesY))) list
+    
+    let update list =
+        List.fold (fun map ((stringX, stringY), ((x,y), spaceX, spaceY)) ->
+                let append string xs ys acc = Map.add string ((x,y), xs, ys) acc   
+                let updateMap string horizontalSpace verticalSpace map =
+                    match (horizontalSpace,verticalSpace) with
+                    | (-1,-1) -> map
+                    | _ ->
+                        let maxSpace = max spaceX spaceY
+                        match Map.tryFind string map with
+                        | None -> map |> append string horizontalSpace verticalSpace
+                        | Some (_, xs, ys) -> 
+                            if (max xs ys) < maxSpace
+                            then map |> append string horizontalSpace verticalSpace
+                            else map
+            
+                if stringX = stringY
+                then  map |> updateMap stringX spaceX spaceY
+                else  map |> updateMap stringX spaceX -1 |> updateMap stringY -1 spaceY  
+            )
+            Map.empty list
+            
+    // map to tile with most empty places for each string
+    let mapWordToTiles =
+        findOccupiedTiles
+        |> mapEmptyPlaces
+        |> mapNeighbouringWords
+        |> update
+    
+    let findBestWords list =
+        List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
             let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
-            let word =
+            let fstWord =
                 match words with
                 | [] -> None
-                | head::_ -> Some head
-            (charLst, word)
-            )
-        |> List.filter (fun (_, word) -> match word with | None -> false | Some _ -> true)
-        |> List.map (fun (c, word) -> (c, word.Value))
-        |> List.sortBy (fun (_, (sum, _)) -> sum)
+                | fst::rst -> Some fst
+            (charLst, fstWord)
+            ) list
+        
+    let findPlayableMoves =
+        Map.toList mapWordToTiles
+        |> findBestWords
+        |> List.filter (fun ( _ , word) -> match word with | None -> false | Some _ -> true)
+        |> List.map (fun (charLst, word) -> (charLst, word.Value))
+        |> List.sortBy (fun (charLst, (sum, word)) -> sum)
 
-    // TODO
-    match listBestChar with
+    match findPlayableMoves with
     | [] -> SMForfeit
-    | (char, (_, word))::_ -> 
-        let ((x,y), placesX, placesY) = Map.find char mapCharToBestTile
-
+    | (charLst, (sum, word))::_ -> 
+        let ((x,y), placesX, placesY) = Map.find charLst mapWordToTiles
+        
         let distanceX, distanceY =
             if placesX >= placesY then (1,0)
             else (0,1)
