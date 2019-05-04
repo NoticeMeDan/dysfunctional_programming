@@ -141,41 +141,28 @@ let createMove word startPos goX goY =
 let createMoveFromListOfWords startPos goX goY describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::xt ->   createMove word startPos goX goY
-    
-// TODO
-let foldAddIndexSetToSet (index, set) acc =
-    let rec aux result rest =
-        match rest with
-        | [] -> result
-        | (char, points)::xt -> aux ((index, char, points)::result) xt
-    
-    (aux [] set) @ acc
+    | word::_ ->   createMove word startPos goX goY
 
-// TODO
-let reversePiecesMap pieces hand =
-    //convert hand to list of (index, set list) list
-    // list.fold  (index, set list) list ->  (index, char, points) list
-    //sort points
-    // map (index, char, points) list -> (char, index) list
-    // list.fold (char, index) list -> map<char, index list>
-
+let mapPiecesToIndexes pieces hand =
     hand
     |> MultiSet.fold
-        (fun acc index ammountAvailable ->
-            [1u .. ammountAvailable]
-            |> List.fold (fun acc2 _ ->
-                acc2 @ [index, Map.find index pieces]) acc)
-        []
-    |> List.fold (fun acc (index, set) ->  foldAddIndexSetToSet (index, Set.toList set) acc) []
-    |> List.sortBy (fun (index, char, points) -> points)
-    |> List.map (fun (index, char, points) -> index, char)
-    |> List.fold (fun acc (index, char) ->
-        match Map.tryFind char acc with
-        | None -> Map.add char [index] acc
-        | Some lst -> Map.add char (index::lst) acc
-        )
-        Map.empty
+        (fun acc i numAvailable -> [1u .. numAvailable] |> List.fold (fun innerAcc _ -> innerAcc @ [i, Map.find i pieces]) acc) []
+    |> List.fold
+      (fun acc (i, set) ->
+        let rec innerFunc result rest =
+            match rest with
+            | [] -> result
+            | (character, points) :: tail -> innerFunc ((i, character, points ):: result) tail
+        (innerFunc [] (Set.toList set)) @ acc
+        ) []
+    |> List.sortBy (fun (_, _, points) -> points)
+    |> List.map (fun (i, character, _) -> i, character)
+    |> List.fold (fun acc (i, character) ->
+        let found = Map.tryFind character acc
+        if found = None then
+            Map.add character [i] acc
+        else
+            Map.add character (i::found.Value) acc) Map.empty
 
 // TODO
 let createWordCombinationsInHand hand pieces= 
@@ -233,7 +220,7 @@ let filterWords (st : State.state) words dictionary =
 
 // TODO. Gave dictionary as argument
 let placeOnEmptyBoard center pieces (st : State.state) hand dict = 
-    let mapCharToIndexes = reversePiecesMap pieces hand
+    let mapCharToIndexes = mapPiecesToIndexes pieces hand
     printfn "%A" mapCharToIndexes
 
     let words = createWordCombinationsInHand hand pieces
@@ -249,13 +236,12 @@ let placeOnEmptyBoard center pieces (st : State.state) hand dict =
 
 // TODO
 let bestExtendingWord pieces (st : State.state) hand charLst lenght (dict: Dictionary.Dictionary) = 
-    let mapCharToIndexes = reversePiecesMap pieces hand
     let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
     let filteredWords =
         filterWords st words dict
         |> List.map (fun string -> string.Remove (0, (List.length charLst)))
 
-    convertStringToPiece filteredWords mapCharToIndexes pieces
+    convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return sumOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
