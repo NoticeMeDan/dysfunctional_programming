@@ -1,5 +1,7 @@
 open System.IO
 
+open System
+open MultiSet
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
@@ -82,7 +84,7 @@ module State =
         overwriteHand st newHand
         
     let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
-        let newHand = List.fold (fun acc (id, _) -> MultiSet.removeSingle id acc) state.hand pieces
+        let newHand = List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
         overwriteHand state newHand
 
 // TODO
@@ -370,12 +372,29 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
         |> mapNeighbouringWords
         |> update
     
+<<<<<<< HEAD
     let findBestWords list =
         List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
+=======
+// todos:
+// place letter in the middle of a word - see comment at the line 408
+// singleletter score, double, etc
+
+// mapCharToBestTile should go from type map<char list, (int*int)*int*int) to map<char list, (int*int)*(int*int)*(int*int))
+// listBestChar should go from type 'a list  to ('a * 'a ) list
+// bestExtendingWord shuld be refractored
+
+    // TODO
+    let listBestChar =
+        mapCharToBestTile
+        |> Map.toList
+        |> List.map (fun (charLst, (_,  placesX, placesY)) -> 
+>>>>>>> dd1140f2d52c8ffe9454c4d1c743df26c8c1c3ea
             let words = bestExtendingWord pieces st hand charLst (max placesX placesY) dict
             let fstWord =
                 match words with
                 | [] -> None
+<<<<<<< HEAD
                 | fst::rst -> Some fst
             (charLst, fstWord)
             ) list
@@ -392,6 +411,21 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
     | (charLst, (sum, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst mapWordToTiles
         
+=======
+                | head::_ -> Some head
+            (charLst, word)
+            )
+        |> List.filter (fun (_, word) -> match word with | None -> false | Some _ -> true)
+        |> List.map (fun (c, word) -> (c, word.Value))
+        |> List.sortBy (fun (_, (sum, _)) -> sum)
+
+    // TODO
+    match listBestChar with
+    | [] -> SMForfeit
+    | (char, (_, word))::_ -> 
+        let ((x,y), placesX, placesY) = Map.find char mapCharToBestTile
+
+>>>>>>> dd1140f2d52c8ffe9454c4d1c743df26c8c1c3ea
         let distanceX, distanceY =
             if placesX >= placesY then (1,0)
             else (0,1)
@@ -406,7 +440,7 @@ let AIDecideMove board pieces (st : State.state) radius placed hand (dict:Dictio
     // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
     match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
-    | None, Some (' ', map) ->      
+    | None, Some (' ', _) ->      
         placeOnEmptyBoard (board.center) pieces st hand dict
     | _, _    ->                                                   
         PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand dict
@@ -422,7 +456,14 @@ let playGame cstream board pieces (st : State.state) words =
     let rec aux (state : State.state) =
         Print.printBoard board 8 (State.lettersPlaced state)
 
-        let move = AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
+        let hasWildcard = MultiSet.contains 0u state.hand
+        
+        let move =
+            if hasWildcard
+            then
+                SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
+            else
+                AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
             
         printfn "Trying to play: %A" move
         send cstream (move)
@@ -442,12 +483,17 @@ let playGame cstream board pieces (st : State.state) words =
             (* Successful piece swap, update state *)
             printfn "Success. You swapped a piece."
             printfn "New piece(s): %A" newPieces
-        | RCM (CMPlayed (pid, moves, points)) ->
+            
+            // Remove wildcards, then add newPieces
+            let newState = state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
+                                     >> State.addPiecesToHand newPieces )
+            aux newState
+        | RCM (CMPlayed (pid, moves, _)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
             let newState = state |> State.addPlacedPiecesToBoard moves
             aux newState
-        | RCM (CMPlayFailed (pid, ms)) ->
+        | RCM (CMPlayFailed (_, _)) ->
             (* Failed play. Update your state *)
             let newState = state // This state needs to be updated
             aux newState
@@ -470,7 +516,6 @@ let setupGame cstream board words =
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
             playGame cstream board pieces (State.newState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
-        
     aux ()
 
 // From Jesper
