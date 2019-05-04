@@ -142,7 +142,7 @@ let createMove word startPos goX goY =
 let createMoveFromListOfWords startPos goX goY describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::_ ->   createMove word startPos goX goY
+    | word::_ -> createMove word startPos goX goY
 
 let mapPiecesToIndexes pieces hand =
     hand
@@ -251,16 +251,16 @@ let bestExtendingWord pieces (state : State.state) hand charLst lenght (dict: Di
     |> List.sortByDescending (fun (sum, x) -> sum)
 
 // TODO
-let charOnTile (x,y) placed board =
-    match Map.tryFind (x, y) placed, ScrabbleUtil.Board.tiles board (x, y) with
+let charOnTile coord placed board =
+    match Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord with
     | None, Some (c, _) -> c
     | Some (c, _), _    -> c
     | _, None -> ' '
 
 // TODO
-let isTileEmpty (x,y) placed board boardRadius =
-    let c = charOnTile (x,y) placed board
-    ((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1 
+let isTileEmpty (coord:coord) placed board boardRadius =
+    let c = charOnTile coord placed board
+    ((' ' = c ) || (System.Char.IsLower c)) && (fst coord) < boardRadius+1 && (snd coord) < boardRadius+1 
 
 let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY boardRadius =
     let placedPieces = state.lettersPlaced
@@ -286,33 +286,33 @@ let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY b
     numberOfEmpty coord 0
 
 // TODO
-let emptyLeft (x,y) placed board = isTileEmpty (x-1,y) placed board
+let emptyLeft coord placed board = isTileEmpty ((fst coord)-1, (snd coord)) placed board
 
 // TODO
-let emptyAbove (x,y) placed board = isTileEmpty (x,y-1) placed board
+let emptyAbove coord placed board = isTileEmpty ((fst coord), (snd coord)-1) placed board
 
 // TODO
-let wordAdjacentToTile (x,y) placed board moveX moveY radius =
-    let rec innerFn (x,y) value =
-        if (isTileEmpty (x,y) placed board radius) then value
+let wordAdjacentToTile coord placed board moveX moveY radius =
+    let rec innerFn coord value =
+        if (isTileEmpty coord placed board radius) then value
         else 
-            let newCoords = (x + moveX, y + moveY)
-            let charOnTile = charOnTile (x,y) placed board
+            let newCoords = ((fst coord) + moveX, (snd coord) + moveY)
+            let charOnTile = charOnTile coord placed board
             innerFn newCoords (charOnTile::value)
-    innerFn (x,y) []
+    innerFn coord []
 
 // TODO
-let findNeighbouringWords (x,y) placed board radius =
-    wordAdjacentToTile (x,y) placed board -1 0 radius, wordAdjacentToTile (x,y) placed board 0 -1 radius
+let findNeighbouringWords (coord:coord) placed board radius =
+    wordAdjacentToTile coord placed board -1 0 radius, wordAdjacentToTile coord placed board 0 -1 radius
 
 // TODO. Gave dictionary as argument
 let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     let placed = state.lettersPlaced
     let hand = state.hand
     // helperMethods
-    let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
+    let isTileEmpty coord = isTileEmpty coord placed board radius
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlacesInDirection (x,y) state board moveX moveY radius
+    let emptyPlaces coord moveX moveY = emptyPlacesInDirection coord state board moveX moveY radius
     
     // board size
     let c = ScrabbleUtil.Board.center board
@@ -331,14 +331,14 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
         tileLocationsRec (letters)   
     
     let mapEmptyPlaces list =
-        List.map (fun (x,y) -> 
-            let xs = emptyPlaces (x,y) 1 0
-            let ys = emptyPlaces (x,y) 0 1
-            ((x,y), xs, ys)) list
+        List.map (fun coord -> 
+            let xs = emptyPlaces coord 1 0
+            let ys = emptyPlaces coord 0 1
+            (coord, xs, ys)) list
     
     let mapNeighbouringWords list =
-        List.map (fun ((x,y), placesX, placesY) ->
-            (findNeighbouringWords (x,y) placed board radius, ((x,y), placesX, placesY))) list
+        List.map (fun (coord, placesX, placesY) ->
+            (findNeighbouringWords coord placed board radius, (coord, placesX, placesY))) list
     
     let update list =
         List.fold (fun map ((stringX, stringY), ((x,y), spaceX, spaceY)) ->
@@ -396,8 +396,9 @@ let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Diction
         
         let x = distanceX + x
         let y = distanceY + y
+        let coord = (x,y)
         
-        createMove word (x,y) distanceX distanceY
+        createMove word coord distanceX distanceY
 
 // TODO
 let AIDecideMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
