@@ -261,22 +261,28 @@ let isTileEmpty (x,y) placed board boardRadius =
     let c = charOnTile (x,y) placed board
     ((' ' = c ) || (System.Char.IsLower c)) && x < boardRadius+1 && y < boardRadius+1 
 
-// TODO
-let emptyPlaces (x,y) placed board moveX moveY handSize boardRadius =
-    let handSize = int handSize
-    let rec innerFn (x,y) value =
-        if (value < handSize)
+let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY boardRadius =
+    let placedPieces = state.lettersPlaced
+    let handSize = state.lettersPlaced |> Map.toList |> List.length
+    
+    let newCoordinate coord = ((fst coord) + moveX, (snd coord) + moveY)
+    
+    let neighbourCheck coord =
+        let neighborCheck1 = isTileEmpty (fst coord + moveY, snd coord + moveX) placedPieces board boardRadius
+        let neighborCheck2 = isTileEmpty (fst coord - moveY, snd coord - moveX) placedPieces board boardRadius
+        neighborCheck1 && neighborCheck2
+    
+    let rec numberOfEmpty coord acc =
+        if (acc < handSize)
         then
-            let newCoords = (x + moveX, y + moveY)
-            let neighborCheck1 = isTileEmpty (fst newCoords + moveY, snd newCoords + moveX) placed board boardRadius
-            let neighborCheck2 = isTileEmpty (fst newCoords - moveY, snd newCoords - moveX) placed board boardRadius
-            let neighborIsOkay = neighborCheck1 && neighborCheck2
-            match isTileEmpty newCoords placed board boardRadius, neighborIsOkay with
-            | true, true ->  (innerFn newCoords (value + 1))
-            | false, _ -> value-1
-            | true, false -> value
-        else value
-    innerFn (x,y) 0
+            let newCoords = newCoordinate coord
+            let neighbourAlright = neighbourCheck newCoords
+            match isTileEmpty newCoords placedPieces board boardRadius, neighbourAlright with
+            | true, true ->  (numberOfEmpty newCoords (acc + 1))
+            | false, _ -> acc-1
+            | true, false -> acc
+        else acc
+    numberOfEmpty coord 0
 
 // TODO
 let emptyLeft (x,y) placed board = isTileEmpty (x-1,y) placed board
@@ -303,7 +309,7 @@ let PlaceOnNonEmptyBoard board pieces (st : State.state) radius placed hand (dic
     // helperMethods
     let isTileEmpty (x,y) = isTileEmpty (x,y) placed board radius
     let handSize = hand |> MultiSet.fold (fun acc _ ammountAvailable -> ammountAvailable + acc) 0u
-    let emptyPlaces (x,y) moveX moveY = emptyPlaces (x,y) placed board moveX moveY handSize radius
+    let emptyPlaces (x,y) moveX moveY = emptyPlacesInDirection (x,y) st board moveX moveY radius
     
     // board size
     let c = ScrabbleUtil.Board.center board
