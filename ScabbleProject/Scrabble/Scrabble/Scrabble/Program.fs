@@ -82,7 +82,7 @@ module State =
         overwriteHand st newHand
         
     let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
-        let newHand = List.fold (fun acc (id, _) -> MultiSet.removeSingle id acc) state.hand pieces
+        let newHand = List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
         overwriteHand state newHand
 
 // TODO
@@ -422,7 +422,14 @@ let playGame cstream board pieces (st : State.state) words =
     let rec aux (state : State.state) =
         Print.printBoard board 8 (State.lettersPlaced state)
 
-        let move = AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
+        let hasWildcard = MultiSet.contains 0u state.hand
+        
+        let move =
+            if hasWildcard
+            then
+                SMChange ([0u])
+            else
+                AIDecideMove board pieces state 8  (State.lettersPlaced state) state.hand dict
             
         printfn "Trying to play: %A" move
         send cstream (move)
@@ -442,6 +449,10 @@ let playGame cstream board pieces (st : State.state) words =
             (* Successful piece swap, update state *)
             printfn "Success. You swapped a piece."
             printfn "New piece(s): %A" newPieces
+            
+            // Remove wildcard, then add newPiece(s)
+            let newState = state |> (State.removeSwappedPiecesFromhand [(0u, 1u)] >> State.addPiecesToHand newPieces )
+            aux newState
         | RCM (CMPlayed (pid, moves, points)) ->
             (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
