@@ -125,21 +125,23 @@ let convertToListOfStrings (lst : Set<char*int> list list) =
 let rec calculatePointsOfWord word =
     match word with 
     | [] -> 0
-    | (_, set) :: tail -> (snd (set |> Set.toList).[0]) + (calculatePointsOfWord tail) 
+    | (_, letters) :: tail -> (snd (letters |> Set.toList).Head) + (calculatePointsOfWord tail) 
 
-// TODO
-let createMove word startPos goX goY =
+let makeMove word startPosition (toCoord: coord) =
     word
-    |> List.map (fun (a ,x) -> (uint32 a, (Set.toList x).[0]))
-    |> List.fold (fun ((x, y), c) value -> ((x + goX, y + goY), ((x,y), value)::c) ) (startPos, [])
+    |> List.map (fun (num ,x) ->
+        (uint32 num, (Set.toList x).Head))
+    |> List.fold (fun ((x, y), char) value ->
+          ((x + fst toCoord, y + snd toCoord), ((x,y), value) :: char))
+          (startPosition, [])
     |> fun (_, x) -> x
     |> SMPlay
 
 // TODO
-let createMoveFromListOfWords startPos goX goY describedWords =
+let createMoveFromListOfWords startPos toCoord describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::_ -> createMove word startPos goX goY
+    | word::_ -> makeMove word startPos toCoord
 
 let mapPiecesToIndexes pieces hand =
     hand
@@ -220,14 +222,13 @@ let playFirstMove center (state : State.state) dict =
 
     let words = createAnagramFromHand hand pieces
     let legalWords = findLegalWords words dict 
-    printfn "filteredWords: %A" legalWords
     
     let describedWords =
         convertStringToPiece legalWords mapCharToIndexes pieces
         |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
     describedWords
-    |> createMoveFromListOfWords center 1 0
+    |> createMoveFromListOfWords center (1, 0)
 
 // TODO
 let bestExtendingWord pieces hand charList lenght (dict: Dictionary) = 
@@ -355,12 +356,12 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary) =
         |> findBestWords
         |> List.filter (fun ( _ , word) -> match word with | None -> false | Some _ -> true)
         |> List.map (fun (charLst, word) -> (charLst, word.Value))
-        |> List.sortBy (fun (charLst, (sum, word)) -> sum)
+        |> List.sortBy (fun (_, (sum, _)) -> sum)
         
     match findPlayableMoves with
     | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
     | [] -> SMForfeit
-    | (charLst, (sum, word))::_ -> 
+    | (charLst, (_, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
         
         let distanceX, distanceY =
@@ -371,7 +372,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary) =
         let y = distanceY + y
         let coord = (x,y)
         
-        createMove word coord distanceX distanceY
+        makeMove word coord (distanceX, distanceY)
     
 let playBestMove board (state : State.state) radius (dict:Dictionary) =
     let pieces = state.pieces
