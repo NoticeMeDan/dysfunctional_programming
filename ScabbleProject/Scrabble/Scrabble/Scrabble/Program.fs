@@ -132,12 +132,6 @@ let makeMove word startPosition (toCoord: coord) =
     |> fun (_, x) -> x
     |> SMPlay
 
-// TODO
-let createMoveFromListOfWords startPos toCoord describedWords =
-    match describedWords with
-    | [] -> SMPass
-    | word::_ -> makeMove word startPos toCoord
-
 let mapPiecesToIndexes pieces hand =
     hand
     |> MultiSet.fold
@@ -181,49 +175,30 @@ let createAnagramFromStartChar hand pieces startCharList length=
     |> List.filter (fun string -> length >= string.Length)
     |> List.map (fun string -> (startCharList |> charsToString) + string)
 
-// TODO
-let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
-    
-    let intList = Map.find key map
-    let map = map |> Map.add key intList.Tail
-
-    (intList.Head, map)
-
-// TODO
-let convertStringToPiece words mapCharToIndexes pieces = 
-    words
-    |> List.map (fun word ->
-                        word
-                        |> Seq.toList
-                        |> List.fold
-                            (fun (acc, _) c ->
-                                      let (index, map) = getAndRemoveIndexFromMap c mapCharToIndexes
-                                      (acc @ [(index, Map.find index pieces)], map) )
-                            ([], mapCharToIndexes)
-                    )
-    |> List.map (fun (x, _) -> x)
+let convertStringToPiece (mapCharToIndexes: Map<'a, 'b list>) pieces word =
+    List.fold (fun a c ->
+                  let indexes = Map.find c mapCharToIndexes
+                  (fst a @ [(indexes.Head, Map.find indexes.Head pieces)],
+                   mapCharToIndexes |> Map.add c indexes.Tail))
+        ([], mapCharToIndexes) (Seq.toList word)
+        
+let convertWordsToPieces words mapCharToIndexes pieces = 
+    List.map (fun word -> word |> convertStringToPiece mapCharToIndexes pieces) words
+    |> List.map (fun x -> fst x)
 
 let findLegalWords words dictionary = 
     words
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
-// TODO. Gave dictionary as argument
 let playFirstMove center (state : State.state) dict =
-    let hand = state.hand
-    let pieces = state.pieces
-    let mapCharToIndexes = mapPiecesToIndexes pieces hand
-    printfn "%A" mapCharToIndexes
-
-    let words = createAnagramFromHand hand pieces
-    let legalWords = findLegalWords words dict 
+    let legalWords = findLegalWords (createAnagramFromHand state.hand state.pieces) dict
+    let pieces = convertWordsToPieces legalWords (mapPiecesToIndexes state.pieces state.hand) state.pieces
+                |> List.sortByDescending (fun word -> calculatePointsOfWord word)
     
-    let wordsToPieces =
-        convertStringToPiece legalWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> calculatePointsOfWord x)
-    
-    wordsToPieces
-    |> createMoveFromListOfWords center (1, 0)
+    match pieces with
+    | [] -> SMPass
+    | word::_ -> makeMove word center (1, 0)
 
 let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
@@ -231,7 +206,7 @@ let findBestWordForRow pieces hand charList length (dict: Dictionary) =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
-    convertStringToPiece legalWords (mapPiecesToIndexes pieces hand) pieces
+    convertWordsToPieces legalWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
@@ -419,9 +394,10 @@ let playScrabble cstream board pieces (state : State.state) words =
             printfn "New piece(s): %A" newPieces
             
             let firstTwoPieces = ((MultiSet.toList state.hand).Head, ((MultiSet.toList state.hand).Tail).Head)
+            let swapped = (Seq.toList (move.ToString())).Item(10)
             // Remove wildcards, then add newPiecesgl
             let newState =
-                if (move.ToString().Contains("[0u"))
+                if (swapped = '0')
                 then state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
                                      >> State.addPiecesToHand newPieces )
                 else state |> (State.removeSwappedPiecesFromhand [(fst firstTwoPieces, 1u); (snd firstTwoPieces, 1u)]
