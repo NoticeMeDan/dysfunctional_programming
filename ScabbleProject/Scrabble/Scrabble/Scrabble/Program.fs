@@ -248,17 +248,18 @@ let bestExtendingWord pieces (state : State.state) hand charLst lenght (dict: Di
     |> Array.toList
     |> List.sortByDescending (fun (sum, x) -> sum)
 
-// TODO
-let charOnTile coord placed board =
-    match Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord with
-    | None, Some (c, _) -> c
-    | Some (c, _), _    -> c
+let tileContent coord placed board =
+    let tile = Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord
+    match tile with
+    | None, Some (char, _) -> char
+    | Some (char, _), _    -> char
     | _, None -> ' '
 
-// TODO
 let isTileEmpty (coord:coord) placed board boardRadius =
-    let c = charOnTile coord placed board
-    ((' ' = c ) || (System.Char.IsLower c)) && (fst coord) < boardRadius+1 && (snd coord) < boardRadius+1 
+    let char = tileContent coord placed board
+    let tileEmpty = (System.Char.IsLower char) || (char = ' ')
+    let isOnBoard = (fst coord) < boardRadius+1 && (snd coord) < boardRadius+1
+    (tileEmpty && isOnBoard) 
 
 let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY boardRadius =
     let placedPieces = state.lettersPlaced
@@ -283,21 +284,14 @@ let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY b
         else acc
     numberOfEmpty coord 0
 
-// TODO
-let emptyLeft coord placed board = isTileEmpty ((fst coord)-1, (snd coord)) placed board
-
-// TODO
-let emptyAbove coord placed board = isTileEmpty ((fst coord), (snd coord)-1) placed board
-
-// TODO
 let wordAdjacentToTile coord placed board moveX moveY radius =
-    let rec innerFn coord value =
-        if (isTileEmpty coord placed board radius) then value
-        else 
+    let rec inner coord value =
+        match isTileEmpty coord placed board radius with
+        | true  -> value
+        | _     ->
             let newCoords = ((fst coord) + moveX, (snd coord) + moveY)
-            let charOnTile = charOnTile coord placed board
-            innerFn newCoords (charOnTile::value)
-    innerFn coord []
+            inner newCoords (tileContent coord placed board::value)
+    inner coord []
 
 let findOccupiedTiles (state: State.state) : coord list =
         let letters = Map.toList state.lettersPlaced;
@@ -369,7 +363,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         |> List.sortBy (fun (charLst, (sum, word)) -> sum)
         
     match findPlayableMoves with
-    | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head]
+    | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
     | [] -> SMForfeit
     | (charLst, (sum, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
