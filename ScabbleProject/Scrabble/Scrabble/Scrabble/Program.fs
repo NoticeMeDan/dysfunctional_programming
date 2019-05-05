@@ -352,7 +352,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary) =
         |> List.sortBy (fun (_, (sum, _)) -> sum)
         
     match findPlayableMoves with
-    | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
+    | [] when Seq.length state.lettersPlaced < 20 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
     | [] -> SMForfeit
     | (charLst, (_, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
@@ -417,9 +417,15 @@ let playScrabble cstream board pieces (state : State.state) words =
             printfn "You swapped a piece(s)."
             printfn "New piece(s): %A" newPieces
             
-            // Remove wildcards, then add newPieces
-            let newState = state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
+            let firstTwoPieces = ((MultiSet.toList state.hand).Head, ((MultiSet.toList state.hand).Tail).Head)
+            // Remove wildcards, then add newPiecesgl
+            let newState =
+                if (move.ToString().Contains("[0u"))
+                then state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
                                      >> State.addPiecesToHand newPieces )
+                else state |> (State.removeSwappedPiecesFromhand [(fst firstTwoPieces, 1u); (snd firstTwoPieces, 1u)]
+                                     >> State.addPiecesToHand newPieces )
+                
             gameLoop newState
         | RCM (CMPlayed (pid, moves, _)) ->
             printfn "Player %A, played:\n %A" pid moves
