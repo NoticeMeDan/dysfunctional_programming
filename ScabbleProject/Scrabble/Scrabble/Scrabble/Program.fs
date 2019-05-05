@@ -4,6 +4,8 @@ open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 open System.Net.Sockets
+open MultiSet
+open Dictionary
 
 // From Jesper.
 module RegEx =
@@ -47,45 +49,41 @@ module RegEx =
 module State = 
     type state = {
         lettersPlaced : Map<ScrabbleUtil.coord, char * int>
-        hand          : MultiSet.MultiSet<uint32>
+        hand          : MultiSet<uint32>
         pieces        : Map<uint32, piece>
     }
     
-    type piecePlaced = (coord * (uint32 * (char * int)))
+    // Denotes a piece that *has* been placed on the board
+    type placedPiece = (coord * (uint32 * (char * int)))
     
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     
     let mkState lp hand pieces = { lettersPlaced = lp; hand = hand; pieces = pieces }
     let newState hand = mkState Map.empty hand
-    let lettersPlaced state = state.lettersPlaced
-    let overwriteLetters state newLettersPlace = mkState newLettersPlace state.hand state.pieces
-    let overwriteHand state newHand = mkState state.lettersPlaced newHand state.pieces
+    let updateHand state newHand = mkState state.lettersPlaced newHand state.pieces
     
-    // Add placed pieces to the local board state and return the updated state
-    // TODO
-    let addPlacedPiecesToBoard (pcs:piecePlaced list) (state:state) =
-        let lettersPlaced' =
+    let addPiecesToBoard (pieces: placedPiece list) (state: state) =
+        let updatedLettersPlaced =
             List.fold (fun lettersPlaced (coord, (_, piece)) ->
-                Map.add coord piece lettersPlaced) state.lettersPlaced pcs
-        overwriteLetters state lettersPlaced'
+                Map.add coord piece lettersPlaced) state.lettersPlaced pieces
+        mkState updatedLettersPlaced state.hand state.pieces
     
-    // Add pieces to hand and return the updated state
-    // TODO
-    let addPiecesToHand (pcs:(uint32*uint32) list) (state:state) =
-        let newHand = List.fold (fun acc (id, x) -> MultiSet.add id x acc) state.hand pcs
-        overwriteHand state newHand
-        
-    // Remove pieces from hand, given a list of moves played, and return the updated state
-    // TODO
-    let removePiecesFromHand (usedPiecesList:piecePlaced list) state =
-        let newHand = List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) state.hand usedPiecesList
-        overwriteHand state newHand
+    let addPiecesToHand (pieces: (uint32 * uint32) list) (state: state) =
+        updateHand state (
+            List.fold (fun acc (id, x) -> MultiSet.add id x acc) state.hand pieces
+        )
         
     let removeSwappedPiecesFromhand (pieces: (uint32 * uint32) list) (state: state) =
-        let newHand = List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
-        overwriteHand state newHand
+        updateHand state (
+            List.fold (fun acc (id, amount) -> MultiSet.remove id amount acc) state.hand pieces
+        )
+        
+    let removePlayedPiecesFromHand (usedPiecesList: placedPiece list) state =
+        updateHand state (
+            List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) state.hand usedPiecesList
+        )
 
-let rec createAnagram list=
+let rec createAnagram list =
     let lengthOfList = List.length list-1
     let array = [0 .. (lengthOfList - 1)]
     
@@ -101,9 +99,9 @@ let rec createAnagram list=
                 ) [nextWord]
         else []
 
-    array |> List.fold (fun acc value -> (anagram [] value Map.empty)@acc) []
+    array |> List.fold (fun acc value -> (anagram [] value Map.empty) @ acc) []
     
-let charListToString (charList:char list) = List.foldBack (fun x acc -> x.ToString() + acc) charList ""
+let charsToString (chars: char list) = System.String.Concat(Array.ofList(chars))
 
 let convertSetToList char =
     char |> Set.map (fun (c, i)->c) |> Set.toArray
@@ -116,24 +114,28 @@ let rec setCharIntListToCharList list =
         [list.[0]] @ (setCharIntListToCharList xtt)
 
 let convertToListOfStrings list =
-    list |> List.map (fun x -> x |> setCharIntListToCharList |> charListToString)
+    list |> List.map (fun x -> x |> setCharIntListToCharList |> charsToString)
 
-let rec pointsumOfWord word =
+let rec calculatePointsOfWord word =
     match word with 
     | [] -> 0
-    | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (pointsumOfWord xt) 
+    | (_, letters) :: tail -> (snd (letters |> Set.toList).Head) + (calculatePointsOfWord tail) 
 
-let createMove word startPosition moveX moveY =
+let makeMove word startPosition (toCoord: coord) =
     word
-    |> List.map (fun (a ,x) -> (uint32 a, (Set.toList x).[0]))
-    |> List.fold (fun (coord, c) value -> ((fst coord + moveX, snd coord + moveY), (coord, value)::c) ) (startPosition, [])
-    |> function | (_, x) -> x
+    |> List.map (fun (num ,x) ->
+        (uint32 num, (Set.toList x).Head))
+    |> List.fold (fun ((x, y), char) value ->
+          ((x + fst toCoord, y + snd toCoord), ((x,y), value) :: char))
+          (startPosition, [])
+    |> fun (_, x) -> x
     |> SMPlay
 
-let createMoveFromListOfWords startPosition moveX moveY describedWords =
+// TODO
+let createMoveFromListOfWords startPos toCoord describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::_ -> createMove word startPosition moveX moveY
+    | word::_ -> makeMove word startPos toCoord
 
 let mapPiecesToIndexes pieces hand =
     hand
@@ -176,7 +178,7 @@ let createAnagramFromStartChar hand pieces startCharList length=
     |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
-    |> List.map (fun string -> (startCharList |> charListToString) + string)
+    |> List.map (fun string -> (startCharList |> charsToString) + string)
 
 // TODO
 let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
@@ -193,12 +195,12 @@ let convertStringToPiece words mapCharToIndexes pieces =
                         word
                         |> Seq.toList
                         |> List.fold
-                            (fun (accRes, accmapCharToIndexes) c ->
+                            (fun (acc, _) c ->
                                       let (index, map) = getAndRemoveIndexFromMap c mapCharToIndexes
-                                      (accRes @ [(index, Map.find index pieces)], map) )
+                                      (acc @ [(index, Map.find index pieces)], map) )
                             ([], mapCharToIndexes)
                     )
-    |> List.map (fun (x, map) -> x)
+    |> List.map (fun (x, _) -> x)
 
 let findLegalWords words dictionary = 
     words
@@ -214,28 +216,26 @@ let playFirstMove center (state : State.state) dict =
 
     let words = createAnagramFromHand hand pieces
     let legalWords = findLegalWords words dict 
-    printfn "legalWords: %A" legalWords
     
     let describedWords =
         convertStringToPiece legalWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> pointsumOfWord x)
+        |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
     describedWords
-    |> createMoveFromListOfWords center 1 0
+    |> createMoveFromListOfWords center (1, 0)
 
-// TODO
-let bestExtendingWord pieces hand charList lenght (dict: Dictionary.Dictionary) = 
-    let words = createAnagramFromStartChar hand pieces charList lenght
+let bestExtendingWord pieces hand charList length (dict: Dictionary) = 
+    let words = createAnagramFromStartChar hand pieces charList length
     let filteredWords =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
     convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
-    |> List.map (fun x -> async { return pointsumOfWord x, x })
+    |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.toList
-    |> List.sortByDescending (fun (sum, x) -> sum)
+    |> List.sortByDescending (fun (sum, _) -> sum)
 
 let tileContent coord placed board =
     let tile = Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord
@@ -257,9 +257,9 @@ let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY b
     let newCoordinate coord = ((fst coord) + moveX, (snd coord) + moveY)
     
     let neighbourCheck coord =
-        let neighborCheck1 = isTileEmpty (fst coord + moveY, snd coord + moveX) placedPieces board boardRadius
-        let neighborCheck2 = isTileEmpty (fst coord - moveY, snd coord - moveX) placedPieces board boardRadius
-        neighborCheck1 && neighborCheck2
+        let neighbourCheck1 = isTileEmpty (fst coord + moveY, snd coord + moveX) placedPieces board boardRadius
+        let neighbourCheck2 = isTileEmpty (fst coord - moveY, snd coord - moveX) placedPieces board boardRadius
+        neighbourCheck1 && neighbourCheck2
     
     let rec numberOfEmpty coord acc =
         if (acc < handSize)
@@ -332,7 +332,7 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
     
     findRowWithMostEmptyTiles
 
-let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
+let findBestMove row pieces (state : State.state) (dict:Dictionary) =
     let findBestWords list =
         List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
             let words = bestExtendingWord pieces state.hand charLst (max placesX placesY) dict
@@ -349,12 +349,12 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         |> findBestWords
         |> List.filter (fun ( _ , word) -> match word with | None -> false | Some _ -> true)
         |> List.map (fun (charLst, word) -> (charLst, word.Value))
-        |> List.sortBy (fun (charLst, (sum, word)) -> sum)
+        |> List.sortBy (fun (_, (sum, _)) -> sum)
         
     match findPlayableMoves with
     | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
     | [] -> SMForfeit
-    | (charLst, (sum, word))::_ -> 
+    | (charLst, (_, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
         
         let distanceX, distanceY =
@@ -365,14 +365,14 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         let y = distanceY + y
         let coord = (x,y)
         
-        createMove word coord distanceX distanceY
+        makeMove word coord (distanceX, distanceY)
     
-let playBestMove board (state : State.state) radius (dict:Dictionary.Dictionary) =
+let playBestMove board (state : State.state) radius (dict:Dictionary) =
     let pieces = state.pieces
     let bestRow = findRowWithMostEmptyTiles board state radius
     findBestMove bestRow pieces state dict
 
-let AIPlay board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
+let AIPlay board pieces (state : State.state) radius (dict:Dictionary)=
     match Map.tryFind (board.center) state.lettersPlaced, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', _) ->      
         playFirstMove (board.center) state dict
@@ -383,18 +383,19 @@ let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
-let playGame cstream board pieces (state : State.state) words =
+let playScrabble cstream board pieces (state : State.state) words =
     let dict = createDictionary words
         
-    let rec aux (state : State.state) =
-        Print.printBoard board 8 (State.lettersPlaced state)
+    let rec gameLoop (state : State.state) =
+        Print.printBoard board 8 (state.lettersPlaced)
 
         let hasWildcard = MultiSet.contains 0u state.hand
         
         let move =
             if hasWildcard
             then
-                SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
+                // Swap the amount of wildcards on hand
+                SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) 
             else
                 AIPlay board pieces state 8 dict
         
@@ -404,39 +405,35 @@ let playGame cstream board pieces (state : State.state) words =
         let msg = recv cstream
         match msg with
         | RCM (CMPlaySuccess(moves, points, newPieces)) ->
-            (* Successful play by you. Update your state *)
-            printfn "Success. You moved: %A" moves
-            printfn "points: %A" points
-            printfn "new pieces %A" newPieces
+            printfn "You moved: %A" moves
+            printfn "Points for move: %A" points
+            printfn "New pieces %A" newPieces
             
-            let newState = state |> (State.addPlacedPiecesToBoard moves
-                         >> State.removePiecesFromHand moves
+            let newState = state |> (State.addPiecesToBoard moves
+                         >> State.removePlayedPiecesFromHand moves
                          >> State.addPiecesToHand newPieces) 
-            aux newState
+            gameLoop newState
         | RCM (CMChangeSuccess (newPieces)) ->
-            (* Successful piece swap, update state *)
-            printfn "Success. You swapped a piece."
+            printfn "You swapped a piece(s)."
             printfn "New piece(s): %A" newPieces
             
             // Remove wildcards, then add newPieces
             let newState = state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
                                      >> State.addPiecesToHand newPieces )
-            aux newState
+            gameLoop newState
         | RCM (CMPlayed (pid, moves, _)) ->
-            (* Successful play by other player. Update your state *)
             printfn "Player %A, played:\n %A" pid moves
-            let newState = state |> State.addPlacedPiecesToBoard moves
-            aux newState
+            let newState = state |> State.addPiecesToBoard moves
+            gameLoop newState
         | RCM (CMPlayFailed (_, _)) ->
-            (* Failed play. Update your state *)
-            let newState = state // This state needs to be updated
-            aux newState
+            let newState = state
+            gameLoop newState
         | RCM (CMGameOver _) -> ()
         | RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RErr err -> printfn "Server Error:\n%A" err; aux state
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; aux state
+        | RErr err -> printfn "Server Error:\n%A" err; gameLoop state
+        | RGPE err -> printfn "Gameplay Error:\n%A" err; gameLoop state
 
-    aux state
+    gameLoop state
 
 // From Jesper
 let setupGame cstream board words =
@@ -448,7 +445,7 @@ let setupGame cstream board words =
         | RCM (CMGameStarted (_, hand, _, pieces, _)) as msg ->
             printfn "Game started %A" msg
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
-            playGame cstream board pieces (State.newState handSet pieces) words
+            playScrabble cstream board pieces (State.newState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
     aux ()
 
