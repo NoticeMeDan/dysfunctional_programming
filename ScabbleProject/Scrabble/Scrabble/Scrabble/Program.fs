@@ -224,13 +224,13 @@ let playFirstMove center (state : State.state) dict =
     wordsToPieces
     |> createMoveFromListOfWords center (1, 0)
 
-let bestExtendingWord pieces hand charList length (dict: Dictionary) = 
+let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
-    let filteredWords =
+    let legalWords =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
-    convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
+    convertStringToPiece legalWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
@@ -335,7 +335,7 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
 let findBestMove row pieces (state : State.state) (dict:Dictionary) =
     let findBestWords list =
         List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces state.hand charLst (max placesX placesY) dict
+            let words = findBestWordForRow pieces state.hand charLst (max placesX placesY) dict
             let fstWord =
                 match words with
                 | [] -> None
