@@ -1,11 +1,8 @@
 open System.IO
 
-open System
-open MultiSet
 open ScrabbleServer
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
-open State
 open System.Net.Sockets
 
 // From Jesper.
@@ -221,7 +218,7 @@ let filterWords (state : State.state) words dictionary =
     |> List.distinct
 
 // TODO. Gave dictionary as argument
-let placeOnEmptyBoard center pieces (state : State.state) dict =
+let playFirstMove center pieces (state : State.state) dict =
     let hand = state.hand
     let mapCharToIndexes = mapPiecesToIndexes pieces hand
     printfn "%A" mapCharToIndexes
@@ -389,23 +386,17 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         
         createMove word coord distanceX distanceY
     
-// TODO. Gave dictionary as argument
-let PlaceOnNonEmptyBoard board pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
-    // AI
+let playBestMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
     let bestRow = findRowWithMostEmptyTiles board state radius
     findBestMove bestRow pieces state dict
 
 // TODO
 let AIMakeMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
-    let placed = state.lettersPlaced
-    let hand = state.hand
-    // type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
-    //type board = { center : coord; usedTile : tile; tiles : coord -> tile option }
-    match Map.tryFind (board.center) placed, ScrabbleUtil.Board.tiles board (board.center) with
+    match Map.tryFind (board.center) state.lettersPlaced, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', _) ->      
-        placeOnEmptyBoard (board.center) pieces state dict
+        playFirstMove (board.center) pieces state dict
     | _, _    ->                                                   
-        PlaceOnNonEmptyBoard board pieces state radius dict
+        playBestMove board pieces state radius dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -426,7 +417,8 @@ let playGame cstream board pieces (state : State.state) words =
                 SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
             else
                 AIMakeMove board pieces state 8 dict
-            
+        
+        if (move.GetType() = SMForfeit.GetType()) then printfn "AI: No move available."
         printfn "Trying to play: %A" move
         send cstream (move)
         let msg = recv cstream
