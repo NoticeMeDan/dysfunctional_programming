@@ -299,10 +299,6 @@ let wordAdjacentToTile coord placed board moveX moveY radius =
             innerFn newCoords (charOnTile::value)
     innerFn coord []
 
-// TODO
-let findNeighbouringWords (coord:coord) placed board radius =
-    wordAdjacentToTile coord placed board -1 0 radius, wordAdjacentToTile coord placed board 0 -1 radius
-
 let findOccupiedTiles (state: State.state) : coord list =
         let letters = Map.toList state.lettersPlaced;
         let rec tileLocationsRec tail = 
@@ -320,7 +316,9 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
     
     let mapNeighbouringWords list =
         List.map (fun (coord, placesX, placesY) ->
-            (findNeighbouringWords coord state.lettersPlaced board radius, (coord, placesX, placesY))) list
+            ((wordAdjacentToTile coord state.lettersPlaced board -1 0 radius,
+              wordAdjacentToTile coord state.lettersPlaced board 0 -1 radius),
+             (coord, placesX, placesY))) list
     
     let update list =
         List.fold (fun map ((stringX, stringY), ((x,y), spaceX, spaceY)) ->
@@ -390,8 +388,7 @@ let playBestMove board pieces (state : State.state) radius (dict:Dictionary.Dict
     let bestRow = findRowWithMostEmptyTiles board state radius
     findBestMove bestRow pieces state dict
 
-// TODO
-let AIMakeMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
+let AIPlay board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     match Map.tryFind (board.center) state.lettersPlaced, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', _) ->      
         playFirstMove (board.center) pieces state dict
@@ -402,7 +399,6 @@ let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     List.fold (fun acc s -> Dictionary.insert s acc) (Dictionary.empty englishAlfabet) words
 
-// From Jesper. But adjusted just handle other input and works with a Dictionary
 let playGame cstream board pieces (state : State.state) words =
     let dict = createDictionary words
         
@@ -416,7 +412,7 @@ let playGame cstream board pieces (state : State.state) words =
             then
                 SMChange (List.replicate (int((MultiSet.numItems 0u state.hand))) 0u) // Swap the amount of wildcards on hand
             else
-                AIMakeMove board pieces state 8 dict
+                AIPlay board pieces state 8 dict
         
         if (move.GetType() = SMForfeit.GetType()) then printfn "AI: No move available."
         printfn "Trying to play: %A" move
