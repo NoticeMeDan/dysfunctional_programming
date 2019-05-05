@@ -88,7 +88,9 @@ let rec createAnagram list =
     let array = [0 .. (lengthOfList - 1)]
     
     let rec anagram wordArray index map =
-        if List.length wordArray < lengthOfList then
+        match List.length wordArray < lengthOfList with
+        | false -> []
+        | true ->
             let nextWord = wordArray @ [list.[index]]
             let newMap = map |> Map.add index index 
             
@@ -97,7 +99,6 @@ let rec createAnagram list =
                 | None -> (anagram nextWord value newMap) @ acc
                 | Some _ -> acc
                 ) [nextWord]
-        else []
 
     array |> List.fold (fun acc value -> (anagram [] value Map.empty) @ acc) []
     
