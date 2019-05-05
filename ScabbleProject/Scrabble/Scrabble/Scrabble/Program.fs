@@ -374,7 +374,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         |> List.sortBy (fun (charLst, (sum, word)) -> sum)
         
     match findPlayableMoves with
-    | [] when Seq.length state.lettersPlaced < 15 -> SMChange (MultiSet.toList state.hand)
+    | [] when Seq.length state.lettersPlaced < 15 -> SMChange [(MultiSet.toList state.hand).Head]
     | [] -> SMForfeit
     | (charLst, (sum, word))::_ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
