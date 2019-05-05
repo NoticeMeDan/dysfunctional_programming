@@ -88,7 +88,9 @@ let rec createAnagram list =
     let array = [0 .. (lengthOfList - 1)]
     
     let rec anagram wordArray index map =
-        if List.length wordArray < lengthOfList then
+        match List.length wordArray < lengthOfList with
+        | false -> []
+        | true ->
             let nextWord = wordArray @ [list.[index]]
             let newMap = map |> Map.add index index 
             
@@ -97,21 +99,20 @@ let rec createAnagram list =
                 | None -> (anagram nextWord value newMap) @ acc
                 | Some _ -> acc
                 ) [nextWord]
-        else []
 
     array |> List.fold (fun acc value -> (anagram [] value Map.empty) @ acc) []
     
 let charsToString (chars: char list) = System.String.Concat(Array.ofList(chars))
 
 let convertSetToList char =
-    char |> Set.map (fun (c, i)->c) |> Set.toArray
+    char |> Set.map (fun (c, _) -> c) |> Set.toArray
     
 let rec setCharIntListToCharList list =
     match list with
     | [] -> []
-    | (char : Set<char*int>) :: xtt ->
+    | (char : Set<char*int>) :: rest ->
         let list = char |> convertSetToList
-        [list.[0]] @ (setCharIntListToCharList xtt)
+        [list.[0]] @ (setCharIntListToCharList rest)
 
 let convertToListOfStrings list =
     list |> List.map (fun x -> x |> setCharIntListToCharList |> charsToString)
@@ -217,20 +218,20 @@ let playFirstMove center (state : State.state) dict =
     let words = createAnagramFromHand hand pieces
     let legalWords = findLegalWords words dict 
     
-    let describedWords =
+    let wordsToPieces =
         convertStringToPiece legalWords mapCharToIndexes pieces
         |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
-    describedWords
+    wordsToPieces
     |> createMoveFromListOfWords center (1, 0)
 
-let bestExtendingWord pieces hand charList length (dict: Dictionary) = 
+let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
-    let filteredWords =
+    let legalWords =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
-    convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
+    convertStringToPiece legalWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
@@ -287,7 +288,7 @@ let findOccupiedTiles (state: State.state) : coord list =
         let rec tileLocationsRec tail = 
             match tail with
             | [] -> []
-            | (x : coord, y)::xx -> x::tileLocationsRec(xx)
+            | (x : coord, _) :: rest -> x :: tileLocationsRec(rest)
         tileLocationsRec (letters)   
 
 let findRowWithMostEmptyTiles board (state : State.state) radius =
@@ -335,11 +336,11 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
 let findBestMove row pieces (state : State.state) (dict:Dictionary) =
     let findBestWords list =
         List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces state.hand charLst (max placesX placesY) dict
+            let words = findBestWordForRow pieces state.hand charLst (max placesX placesY) dict
             let fstWord =
                 match words with
                 | [] -> None
-                | fst::rst -> Some fst
+                | first :: _ -> Some first 
             (charLst, fstWord)
             ) list
         
@@ -354,7 +355,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary) =
     match findPlayableMoves with
     | [] when Seq.length state.lettersPlaced < 20 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
     | [] -> SMForfeit
-    | (charLst, (_, word))::_ -> 
+    | (charLst, (_, word)) :: _ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
         
         let distanceX, distanceY =
