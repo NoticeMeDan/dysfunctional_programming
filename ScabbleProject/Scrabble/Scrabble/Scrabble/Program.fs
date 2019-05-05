@@ -103,44 +103,37 @@ let rec createAnagram list=
 
     array |> List.fold (fun acc value -> (anagram [] value Map.empty)@acc) []
     
-// TODO
-let charListToString (cl:char list) = List.foldBack (fun x acc -> x.ToString() + acc) cl ""
+let charListToString (charList:char list) = List.foldBack (fun x acc -> x.ToString() + acc) charList ""
 
-// TODO
-let rec setCharIntListToCharList lst =
-    match lst with
+let convertSetToList char =
+    char |> Set.map (fun (c, i)->c) |> Set.toArray
+    
+let rec setCharIntListToCharList list =
+    match list with
     | [] -> []
     | (char : Set<char*int>) :: xtt ->
-        let x =
-            char
-            |> Set.map (fun (c, i)->c)
-            |> Set.toArray
-        [x.[0]] @ (setCharIntListToCharList xtt)        //todo don't just take the first
+        let list = char |> convertSetToList
+        [list.[0]] @ (setCharIntListToCharList xtt)
 
-// TODO
-let convertToListOfStrings (lst : Set<char*int> list list) =
-    lst
-    |>List.map (fun x -> x |> setCharIntListToCharList |> charListToString)
+let convertToListOfStrings list =
+    list |> List.map (fun x -> x |> setCharIntListToCharList |> charListToString)
 
-// TODO
-let rec sumOfWord word =
+let rec pointsumOfWord word =
     match word with 
     | [] -> 0
-    | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (sumOfWord xt) 
+    | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (pointsumOfWord xt) 
 
-// TODO
-let createMove word startPos goX goY =
+let createMove word startPosition moveX moveY =
     word
     |> List.map (fun (a ,x) -> (uint32 a, (Set.toList x).[0]))
-    |> List.fold (fun ((x, y), c) value -> ((x + goX, y + goY), ((x,y), value)::c) ) (startPos, [])
-    |>function | (_, x) -> x
+    |> List.fold (fun (coord, c) value -> ((fst coord + moveX, snd coord + moveY), (coord, value)::c) ) (startPosition, [])
+    |> function | (_, x) -> x
     |> SMPlay
 
-// TODO
-let createMoveFromListOfWords startPos goX goY describedWords =
+let createMoveFromListOfWords startPosition moveX moveY describedWords =
     match describedWords with
     | [] -> SMPass
-    | word::_ -> createMove word startPos goX goY
+    | word::_ -> createMove word startPosition moveX moveY
 
 let mapPiecesToIndexes pieces hand =
     hand
@@ -221,11 +214,11 @@ let playFirstMove center (state : State.state) dict =
 
     let words = createAnagramFromHand hand pieces
     let legalWords = findLegalWords words dict 
-    printfn "filteredWords: %A" legalWords
+    printfn "legalWords: %A" legalWords
     
     let describedWords =
         convertStringToPiece legalWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> sumOfWord x)
+        |> List.sortByDescending (fun x -> pointsumOfWord x)
     
     describedWords
     |> createMoveFromListOfWords center 1 0
@@ -238,7 +231,7 @@ let bestExtendingWord pieces hand charList lenght (dict: Dictionary.Dictionary) 
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
     convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
-    |> List.map (fun x -> async { return sumOfWord x, x })
+    |> List.map (fun x -> async { return pointsumOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.toList
