@@ -217,11 +217,11 @@ let playFirstMove center (state : State.state) dict =
     let words = createAnagramFromHand hand pieces
     let legalWords = findLegalWords words dict 
     
-    let describedWords =
+    let wordsToPieces =
         convertStringToPiece legalWords mapCharToIndexes pieces
         |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
-    describedWords
+    wordsToPieces
     |> createMoveFromListOfWords center (1, 0)
 
 let bestExtendingWord pieces hand charList length (dict: Dictionary) = 
