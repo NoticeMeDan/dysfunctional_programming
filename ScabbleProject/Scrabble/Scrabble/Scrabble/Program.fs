@@ -99,11 +99,8 @@ let rec createAnagram list =
                 ) [nextWord]
         else []
 
-    array |> List.fold (fun acc value -> (anagram [] value Map.empty)@acc) []
+    array |> List.fold (fun acc value -> (anagram [] value Map.empty) @ acc) []
     
-// TODO
-let charListToString (cl:char list) = List.foldBack (fun x acc -> x.ToString() + acc) cl ""
-
 // TODO
 let rec setCharIntListToCharList lst =
     match lst with
@@ -115,23 +112,27 @@ let rec setCharIntListToCharList lst =
             |> Set.toArray
         [x.[0]] @ (setCharIntListToCharList xtt)        //todo don't just take the first
 
+let charsToString (chars: char list) = System.String.Concat(Array.ofList(chars))
+
 // TODO
 let convertToListOfStrings (lst : Set<char*int> list list) =
     lst
-    |>List.map (fun x -> x |> setCharIntListToCharList |> charListToString)
+    |> List.map (fun x ->
+        x
+        |> setCharIntListToCharList
+        |> charsToString)
 
-// TODO
-let rec sumOfWord word =
+let rec calculatePointsOfWord word =
     match word with 
     | [] -> 0
-    | (index, set)::xt -> (snd (set |> Set.toList).[0]) + (sumOfWord xt) 
+    | (_, set) :: tail -> (snd (set |> Set.toList).[0]) + (calculatePointsOfWord tail) 
 
 // TODO
 let createMove word startPos goX goY =
     word
     |> List.map (fun (a ,x) -> (uint32 a, (Set.toList x).[0]))
     |> List.fold (fun ((x, y), c) value -> ((x + goX, y + goY), ((x,y), value)::c) ) (startPos, [])
-    |>function | (_, x) -> x
+    |> fun (_, x) -> x
     |> SMPlay
 
 // TODO
@@ -181,7 +182,7 @@ let createAnagramFromStartChar hand pieces startCharList length=
     |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
-    |> List.map (fun string -> (startCharList |> charListToString) + string)
+    |> List.map (fun string -> (startCharList |> charsToString) + string)
 
 // TODO
 let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
@@ -198,12 +199,12 @@ let convertStringToPiece words mapCharToIndexes pieces =
                         word
                         |> Seq.toList
                         |> List.fold
-                            (fun (accRes, accmapCharToIndexes) c ->
+                            (fun (acc, _) c ->
                                       let (index, map) = getAndRemoveIndexFromMap c mapCharToIndexes
-                                      (accRes @ [(index, Map.find index pieces)], map) )
+                                      (acc @ [(index, Map.find index pieces)], map) )
                             ([], mapCharToIndexes)
                     )
-    |> List.map (fun (x, map) -> x)
+    |> List.map (fun (x, _) -> x)
 
 let findLegalWords words dictionary = 
     words
@@ -223,7 +224,7 @@ let playFirstMove center (state : State.state) dict =
     
     let describedWords =
         convertStringToPiece legalWords mapCharToIndexes pieces
-        |> List.sortByDescending (fun x -> sumOfWord x)
+        |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
     describedWords
     |> createMoveFromListOfWords center 1 0
@@ -236,11 +237,11 @@ let bestExtendingWord pieces hand charList lenght (dict: Dictionary) =
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
     convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
-    |> List.map (fun x -> async { return sumOfWord x, x })
+    |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
     |> Array.toList
-    |> List.sortByDescending (fun (sum, x) -> sum)
+    |> List.sortByDescending (fun (sum, _) -> sum)
 
 let tileContent coord placed board =
     let tile = Map.tryFind coord placed, ScrabbleUtil.Board.tiles board coord
