@@ -198,7 +198,7 @@ let playFirstMove center (state : State.state) dict =
     
     match pieces with
     | [] -> SMPass
-    | word::_ -> makeMove word center (1, 0)
+    | _ -> makeMove pieces.Head (fst center-(pieces.Head.Length-1), snd center) (1, 0)
 
 let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
@@ -328,7 +328,7 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary) =
         |> List.sortBy (fun (_, (sum, _)) -> sum)
         
     match findPlayableMoves with
-    | [] when Seq.length state.lettersPlaced < 20 -> SMChange [(MultiSet.toList state.hand).Head; ((MultiSet.toList state.hand).Tail).Head ]
+    | [] when Seq.length state.lettersPlaced < 30 -> SMChange (MultiSet.toList state.hand)
     | [] -> SMForfeit
     | (charLst, (_, word)) :: _ -> 
         let ((x,y), placesX, placesY) = Map.find charLst row
@@ -393,14 +393,14 @@ let playScrabble cstream board pieces (state : State.state) words =
             printfn "You swapped a piece(s)."
             printfn "New piece(s): %A" newPieces
             
-            let firstTwoPieces = ((MultiSet.toList state.hand).Head, ((MultiSet.toList state.hand).Tail).Head)
+            let wholeHand = MultiSet.toList state.hand |> List.map (fun x -> (x, 1u))
             let swapped = (Seq.toList (move.ToString())).Item(10)
             // Remove wildcards, then add newPiecesgl
             let newState =
                 if (swapped = '0')
                 then state |> (State.removeSwappedPiecesFromhand [(0u, MultiSet.numItems 0u state.hand)]
                                      >> State.addPiecesToHand newPieces )
-                else state |> (State.removeSwappedPiecesFromhand [(fst firstTwoPieces, 1u); (snd firstTwoPieces, 1u)]
+                else state |> (State.removeSwappedPiecesFromhand wholeHand
                                      >> State.addPiecesToHand newPieces )
                 
             gameLoop newState
