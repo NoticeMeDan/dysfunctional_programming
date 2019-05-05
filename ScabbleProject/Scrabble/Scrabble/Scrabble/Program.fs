@@ -163,31 +163,27 @@ let mapPiecesToIndexes pieces hand =
         else
             Map.add character (i::found.Value) acc) Map.empty
 
-// TODO
-let createWordCombinationsInHand hand pieces= 
-    hand
-    |> MultiSet.fold
+let piecesMapToList pieces =
+    MultiSet.fold
         (fun acc index ammountAvailable ->
             [1u .. ammountAvailable]
             |> List.fold (fun acc2 _ ->
                 acc2 @ [Map.find index pieces]) acc)
         []
+        
+let createAnagramFromHand hand pieces = 
+    hand
+    |> piecesMapToList pieces
     |> createAnagram
     |> convertToListOfStrings
 
-// TODO
-let createWordCombinationsInHandFromStartChar hand pieces startCharLst length= 
+let createAnagramFromStartChar hand pieces startCharList length= 
     hand
-    |> MultiSet.fold
-        (fun acc index ammountAvailable ->
-            [1u .. ammountAvailable]
-            |> List.fold (fun acc2 _ ->
-                acc2 @ [Map.find index pieces]) acc)
-        []
+    |> piecesMapToList pieces
     |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
-    |> List.map (fun string -> (startCharLst |> charListToString) + string)
+    |> List.map (fun string -> (startCharList |> charListToString) + string)
 
 // TODO
 let getAndRemoveIndexFromMap key (map : Map<'a, 'b list>) =
@@ -211,35 +207,35 @@ let convertStringToPiece words mapCharToIndexes pieces =
                     )
     |> List.map (fun (x, map) -> x)
 
-// TODO. Gave dictionary as argument
-let filterWords (state : State.state) words dictionary = 
+let findLegalWords words dictionary = 
     words
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
 // TODO. Gave dictionary as argument
-let playFirstMove center pieces (state : State.state) dict =
+let playFirstMove center (state : State.state) dict =
     let hand = state.hand
+    let pieces = state.pieces
     let mapCharToIndexes = mapPiecesToIndexes pieces hand
     printfn "%A" mapCharToIndexes
 
-    let words = createWordCombinationsInHand hand pieces
-    let filteredWords = filterWords state words dict 
-    printfn "filteredWords: %A" filteredWords
+    let words = createAnagramFromHand hand pieces
+    let legalWords = findLegalWords words dict 
+    printfn "filteredWords: %A" legalWords
     
     let describedWords =
-        convertStringToPiece filteredWords mapCharToIndexes pieces
+        convertStringToPiece legalWords mapCharToIndexes pieces
         |> List.sortByDescending (fun x -> sumOfWord x)
     
     describedWords
     |> createMoveFromListOfWords center 1 0
 
 // TODO
-let bestExtendingWord pieces (state : State.state) hand charLst lenght (dict: Dictionary.Dictionary) = 
-    let words = createWordCombinationsInHandFromStartChar hand pieces charLst lenght
+let bestExtendingWord pieces hand charList lenght (dict: Dictionary.Dictionary) = 
+    let words = createAnagramFromStartChar hand pieces charList lenght
     let filteredWords =
-        filterWords state words dict
-        |> List.map (fun string -> string.Remove (0, (List.length charLst)))
+        findLegalWords words dict
+        |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
     convertStringToPiece filteredWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return sumOfWord x, x })
@@ -346,7 +342,7 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
 let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
     let findBestWords list =
         List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
-            let words = bestExtendingWord pieces state state.hand charLst (max placesX placesY) dict
+            let words = bestExtendingWord pieces state.hand charLst (max placesX placesY) dict
             let fstWord =
                 match words with
                 | [] -> None
@@ -378,16 +374,17 @@ let findBestMove row pieces (state : State.state) (dict:Dictionary.Dictionary) =
         
         createMove word coord distanceX distanceY
     
-let playBestMove board pieces (state : State.state) radius (dict:Dictionary.Dictionary) =
+let playBestMove board (state : State.state) radius (dict:Dictionary.Dictionary) =
+    let pieces = state.pieces
     let bestRow = findRowWithMostEmptyTiles board state radius
     findBestMove bestRow pieces state dict
 
 let AIPlay board pieces (state : State.state) radius (dict:Dictionary.Dictionary)=
     match Map.tryFind (board.center) state.lettersPlaced, ScrabbleUtil.Board.tiles board (board.center) with
     | None, Some (' ', _) ->      
-        playFirstMove (board.center) pieces state dict
+        playFirstMove (board.center) state dict
     | _, _    ->                                                   
-        playBestMove board pieces state radius dict
+        playBestMove board state radius dict
 
 let createDictionary words =
     let englishAlfabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
