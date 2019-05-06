@@ -59,7 +59,7 @@ module State =
     type tile = char * Map<uint32, uint32 -> (char * int)[] -> int -> int>
     
     let mkState lp hand pieces = { lettersPlaced = lp; hand = hand; pieces = pieces }
-    let newState hand = mkState Map.empty hand
+    let mkEmptyState hand = mkState Map.empty hand
     let updateHand state newHand = mkState state.lettersPlaced newHand state.pieces
     
     let addPiecesToBoard (pieces: placedPiece list) (state: state) =
@@ -83,24 +83,24 @@ module State =
             List.fold (fun acc (_, (id, _)) -> MultiSet.removeSingle id acc) state.hand usedPiecesList
         )
 
-let rec createAnagram list =
-    let lengthOfList = List.length list-1
+let rec createAnagram letters =
+    let lengthOfList = List.length letters - 1
     let array = [0 .. (lengthOfList)]
     
-    let rec anagram wordArray index (map:Map<int,int>) =
+    let rec anagram wordArray index (map: Map<int,int>) =
         match List.length wordArray < lengthOfList with
         | false -> []
         | true ->
-            let nextWord = List.append wordArray [list.[index]]
             let updatedMap = map.Add(index,index) 
+            let nextWord = List.append wordArray [letters.[index]]
             
-            array |> List.fold (fun acc value ->
+            array |> List.fold (fun wordSoFar value ->
                 match Map.tryFind value updatedMap with
-                | None -> (anagram nextWord value updatedMap) @ acc
-                | Some _ -> acc
+                | None -> List.append (anagram nextWord value updatedMap) wordSoFar
+                | Some _ -> wordSoFar
                 ) [nextWord]
 
-    array |> List.fold (fun acc value -> (anagram [] value Map.empty) @ acc) []
+    array |> List.fold (fun acc value -> List.append (anagram [] value Map.empty) acc) []
     
 let charsToString (chars: char list) = System.String.Concat(Array.ofList(chars))
 
@@ -112,15 +112,10 @@ let rec setCharIntListToCharList list =
     | [] -> []
     | (char : Set<char*int>) :: rest ->
         let list = char |> convertSetToList
-        [list.[0]] @ (setCharIntListToCharList rest)
+        List.append [list.[0]] (setCharIntListToCharList rest)
 
 let convertToListOfStrings list =
     list |> List.map (fun x -> x |> setCharIntListToCharList |> charsToString)
-
-let rec calculatePointsOfWord word =
-    match word with 
-    | [] -> 0
-    | (_, letters) :: tail -> (snd (letters |> Set.toList).Head) + (calculatePointsOfWord tail) 
 
 let makeMove word startPosition (toCoord: coord) =
     word
@@ -142,14 +137,14 @@ let createMoveFromWords startPos toCoord (wordsToPieces : List<'a>)=
 let mapPiecesToIndexes pieces hand =
     hand
     |> MultiSet.fold
-        (fun acc i numAvailable -> [1u .. numAvailable] |> List.fold (fun innerAcc _ -> innerAcc @ [i, Map.find i pieces]) acc) []
+        (fun acc i numAvailable -> List.fold (fun innerAcc _ -> List.append innerAcc [i, Map.find i pieces]) acc [1u .. numAvailable]) []
     |> List.fold
-      (fun acc (i, set) ->
+      (fun acc (i, letters) ->
         let rec innerFunc result rest =
             match rest with
             | [] -> result
-            | (character, points) :: tail -> innerFunc ((i, character, points ):: result) tail
-        (innerFunc [] (Set.toList set)) @ acc
+            | (character, points) :: tail -> innerFunc ((i, character, points ) :: result) tail
+        List.append (innerFunc [] (Set.toList letters)) acc
         ) []
     |> List.sortBy (fun (_, _, points) -> points)
     |> List.map (fun (i, character, _) -> i, character)
@@ -158,25 +153,25 @@ let mapPiecesToIndexes pieces hand =
         if found = None then
             Map.add character [i] acc
         else
-            Map.add character (i::found.Value) acc) Map.empty
+            Map.add character (i :: found.Value) acc) Map.empty
 
-let piecesMapToList pieces =
+let mapPiecesToList pieces =
     MultiSet.fold
-        (fun acc index ammountAvailable ->
-            [1u .. ammountAvailable]
-            |> List.fold (fun acc2 _ ->
-                acc2 @ [Map.find index pieces]) acc)
+        (fun acc index amount ->
+            [1u .. amount]
+            |> List.fold (fun innerAcc _ ->
+                List.append innerAcc [Map.find index pieces]) acc)
         []
         
 let createAnagramFromHand hand pieces = 
     hand
-    |> piecesMapToList pieces
+    |> mapPiecesToList pieces
     |> createAnagram
     |> convertToListOfStrings
 
-let createAnagramFromStartChar hand pieces startCharList length= 
+let createAnagramFromStartChar hand pieces startCharList length = 
     hand
-    |> piecesMapToList pieces
+    |> mapPiecesToList pieces
     |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
@@ -185,7 +180,7 @@ let createAnagramFromStartChar hand pieces startCharList length=
 let convertStringToPiece (mapCharToIndexes: Map<'a, 'b list>) pieces word =
     List.fold (fun a c ->
                   let indexes = Map.find c mapCharToIndexes
-                  (fst a @ [(indexes.Head, Map.find indexes.Head pieces)],
+                  (List.append (fst a) [(indexes.Head, Map.find indexes.Head pieces)],
                    mapCharToIndexes |> Map.add c indexes.Tail))
         ([], mapCharToIndexes) (Seq.toList word)
         
@@ -198,6 +193,12 @@ let findLegalWords words dictionary =
     |> List.filter (fun x -> Dictionary.lookup x dictionary)
     |> List.distinct
 
+let rec calculatePointsOfWord word =
+    match word with 
+    | [] -> 0
+    | (_, letters) :: tail ->
+        (snd (letters |> Set.toList).Head) + (calculatePointsOfWord tail) 
+
 let playFirstMove center (state : State.state) dict =
     let legalWords = findLegalWords (createAnagramFromHand state.hand state.pieces) dict
     let pieces = convertWordsToPieces legalWords (mapPiecesToIndexes state.pieces state.hand) state.pieces
@@ -205,7 +206,7 @@ let playFirstMove center (state : State.state) dict =
     
     match pieces with
     | [] -> SMPass
-    | _ -> makeMove pieces.Head (fst center-(pieces.Head.Length-1), snd center) (1, 0)
+    | _ -> makeMove pieces.Head (fst center - (pieces.Head.Length - 1), snd center) (1, 0)
 
 let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
@@ -315,9 +316,9 @@ let findRowWithMostEmptyTiles board (state : State.state) radius =
     
     findRowWithMostEmptyTiles
 
-let findBestMove row pieces (state : State.state) (dict:Dictionary) =
+let findBestMove row pieces (state : State.state) (dict: Dictionary) =
     let findBestWords list =
-        List.map (fun (charLst, ((x,y),  placesX, placesY)) -> 
+        List.map (fun (charLst, (_,  placesX, placesY)) -> 
             let words = findBestWordForRow pieces state.hand charLst (max placesX placesY) dict
             let fstWord =
                 match words with
@@ -435,7 +436,7 @@ let setupGame cstream board words =
         | RCM (CMGameStarted (_, hand, _, pieces, _)) as msg ->
             printfn "Game started %A" msg
             let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
-            playScrabble cstream board pieces (State.newState handSet pieces) words
+            playScrabble cstream board pieces (State.mkEmptyState handSet pieces) words
         | msg -> failwith (sprintf "Game initialisation failed. Unexpected message %A" msg)
     aux ()
 
@@ -466,7 +467,7 @@ let startGame port numberOfPlayers =
         let timeout = None
         let sizeOfHand = 7u
 
-        send cstream (SMStartGame (numberOfPlayers, "game", "password", "NoticeMeDan", seed, board, pieces,
+        send cstream (SMStartGame (numberOfPlayers, "game", "password", "dysfunctional programming", seed, board, pieces,
                                     sizeOfHand, alphabet, words, timeout))
 
         let gameId =
