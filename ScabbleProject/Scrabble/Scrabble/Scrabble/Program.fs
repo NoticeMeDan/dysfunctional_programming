@@ -85,18 +85,18 @@ module State =
 
 let rec createAnagram list =
     let lengthOfList = List.length list-1
-    let array = [0 .. (lengthOfList - 1)]
+    let array = [0 .. (lengthOfList)]
     
-    let rec anagram wordArray index map =
+    let rec anagram wordArray index (map:Map<int,int>) =
         match List.length wordArray < lengthOfList with
         | false -> []
         | true ->
-            let nextWord = wordArray @ [list.[index]]
-            let newMap = map |> Map.add index index 
+            let nextWord = List.append wordArray [list.[index]]
+            let updatedMap = map.Add(index,index) 
             
             array |> List.fold (fun acc value ->
-                match Map.tryFind value newMap with
-                | None -> (anagram nextWord value newMap) @ acc
+                match Map.tryFind value updatedMap with
+                | None -> (anagram nextWord value updatedMap) @ acc
                 | Some _ -> acc
                 ) [nextWord]
 
@@ -132,11 +132,12 @@ let makeMove word startPosition (toCoord: coord) =
     |> fun (_, x) -> x
     |> SMPlay
 
-// TODO
-let createMoveFromListOfWords startPos toCoord describedWords =
-    match describedWords with
-    | [] -> SMPass
-    | word::_ -> makeMove word startPos toCoord
+let createMoveFromWords startPos toCoord (wordsToPieces : List<'a>)=
+    let result = 
+        if wordsToPieces.Equals [] then SMPass
+        else makeMove wordsToPieces.Head startPos toCoord
+    
+    result
 
 let mapPiecesToIndexes pieces hand =
     hand
@@ -223,7 +224,7 @@ let playFirstMove center (state : State.state) dict =
         |> List.sortByDescending (fun x -> calculatePointsOfWord x)
     
     wordsToPieces
-    |> createMoveFromListOfWords center (1, 0)
+    |> createMoveFromWords center (1, 0)
 
 let findBestWordForRow pieces hand charList length (dict: Dictionary) = 
     let words = createAnagramFromStartChar hand pieces charList length
