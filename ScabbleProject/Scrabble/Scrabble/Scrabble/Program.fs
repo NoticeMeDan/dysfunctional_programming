@@ -132,23 +132,32 @@ let iterateMultiset set pieces =
         List.fold (fun newList _ -> List.append newList [index, Map.find index pieces]) acc [1u .. size]) []
 
 let mapPiecesToIndexes pieces hand =
-    iterateMultiset hand pieces 
-    |> List.fold
-      (fun acc (i, letters) ->
-        let rec innerFunc result rest =
-            match rest with
-            | [] -> result
-            | (character, points) :: tail -> innerFunc ((i, character, points ) :: result) tail
-        List.append (innerFunc [] (Set.toList letters)) acc
-        ) []
-    |> List.sortBy (fun (_, _, points) -> points)
-    |> List.map (fun (i, character, _) -> i, character)
-    |> List.fold (fun acc (i, character) ->
+    let tupleList = 
+        iterateMultiset hand pieces 
+        |> List.fold
+          (fun acc (i, letters) ->
+            let rec innerFunc result rest =
+                match rest with
+                | [] -> result
+                | (character, points) :: tail -> innerFunc ((i, character, points ) :: result) tail
+            List.append (innerFunc [] (Set.toList letters)) acc
+            ) []
+    
+    let sortByPoints =
+        tupleList |> List.sortBy (fun (_, _, points) -> points)
+    
+    let indexCharList =
+        sortByPoints |> List.map (fun (i, character, _) -> i, character)
+    
+    let result =
+        indexCharList |> List.fold (fun acc (i, character) ->
         let found = Map.tryFind character acc
         if found = None then
             Map.add character [i] acc
         else
             Map.add character (i :: found.Value) acc) Map.empty
+        
+    result 
         
 let createAnagramFromHand hand pieces = 
     iterateMultiset hand pieces
