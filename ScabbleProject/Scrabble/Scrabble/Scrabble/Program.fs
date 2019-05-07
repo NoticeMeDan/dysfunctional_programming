@@ -127,13 +127,6 @@ let makeMove word startPosition (toCoord: coord) =
     |> fun (_, x) -> x
     |> SMPlay
 
-let createMoveFromWords startPos toCoord (wordsToPieces : List<'a>)=
-    let result = 
-        if wordsToPieces.Equals [] then SMPass
-        else makeMove wordsToPieces.Head startPos toCoord
-    
-    result
-
 let mapPiecesToIndexes pieces hand =
     hand
     |> MultiSet.fold
