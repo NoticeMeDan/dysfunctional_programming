@@ -131,14 +131,6 @@ let iterateMultiset set pieces =
     set |> MultiSet.fold (fun acc i numAvailable ->
         List.fold (fun innerAcc _ -> List.append innerAcc [i, Map.find i pieces]) acc [1u .. numAvailable]) []
 
-let mapPiecesToList pieces =
-    MultiSet.fold
-        (fun acc index amount ->
-            [1u .. amount]
-            |> List.fold (fun innerAcc _ ->
-                List.append innerAcc [Map.find index pieces]) acc)
-        []
-
 let mapPiecesToIndexes pieces hand =
     iterateMultiset hand pieces 
     |> List.fold
@@ -159,14 +151,14 @@ let mapPiecesToIndexes pieces hand =
             Map.add character (i :: found.Value) acc) Map.empty
         
 let createAnagramFromHand hand pieces = 
-    hand
-    |> mapPiecesToList pieces
+    iterateMultiset hand pieces
+    |> List.map (fun (x,y) -> y)
     |> createAnagram
     |> convertToListOfStrings
 
 let createAnagramFromStartChar hand pieces startCharList length = 
-    hand
-    |> mapPiecesToList pieces
+    iterateMultiset hand pieces
+    |> List.map (fun (x,y) -> y)
     |> createAnagram
     |> convertToListOfStrings
     |> List.filter (fun string -> length >= string.Length)
