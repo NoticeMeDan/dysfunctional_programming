@@ -127,10 +127,20 @@ let makeMove word startPosition (toCoord: coord) =
     |> fun (_, x) -> x
     |> SMPlay
 
+let iterateMultiset set pieces =
+    set |> MultiSet.fold (fun acc i numAvailable ->
+        List.fold (fun innerAcc _ -> List.append innerAcc [i, Map.find i pieces]) acc [1u .. numAvailable]) []
+
+let mapPiecesToList pieces =
+    MultiSet.fold
+        (fun acc index amount ->
+            [1u .. amount]
+            |> List.fold (fun innerAcc _ ->
+                List.append innerAcc [Map.find index pieces]) acc)
+        []
+
 let mapPiecesToIndexes pieces hand =
-    hand
-    |> MultiSet.fold
-        (fun acc i numAvailable -> List.fold (fun innerAcc _ -> List.append innerAcc [i, Map.find i pieces]) acc [1u .. numAvailable]) []
+    iterateMultiset hand pieces 
     |> List.fold
       (fun acc (i, letters) ->
         let rec innerFunc result rest =
@@ -147,14 +157,6 @@ let mapPiecesToIndexes pieces hand =
             Map.add character [i] acc
         else
             Map.add character (i :: found.Value) acc) Map.empty
-
-let mapPiecesToList pieces =
-    MultiSet.fold
-        (fun acc index amount ->
-            [1u .. amount]
-            |> List.fold (fun innerAcc _ ->
-                List.append innerAcc [Map.find index pieces]) acc)
-        []
         
 let createAnagramFromHand hand pieces = 
     hand
