@@ -128,8 +128,8 @@ let makeMove word startPosition (toCoord: coord) =
     |> SMPlay
 
 let iterateMultiset set pieces =
-    set |> MultiSet.fold (fun acc i numAvailable ->
-        List.fold (fun innerAcc _ -> List.append innerAcc [i, Map.find i pieces]) acc [1u .. numAvailable]) []
+    set |> MultiSet.fold (fun acc index size ->
+        List.fold (fun newList _ -> List.append newList [index, Map.find index pieces]) acc [1u .. size]) []
 
 let mapPiecesToIndexes pieces hand =
     iterateMultiset hand pieces 
