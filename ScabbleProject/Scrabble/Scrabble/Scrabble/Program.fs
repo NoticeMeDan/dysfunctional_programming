@@ -177,15 +177,15 @@ let createAnagramFromStartChar hand pieces startCharList length =
     |> List.filter (fun string -> length >= string.Length)
     |> List.map (fun string -> (startCharList |> charsToString) + string)
 
-let convertStringToPiece (mapCharToIndexes: Map<'a, 'b list>) pieces word =
+let stringToPiece (mapCharToIndexes: Map<'a, 'b list>) pieces word =
     List.fold (fun a c ->
                   let indexes = Map.find c mapCharToIndexes
                   (List.append (fst a) [(indexes.Head, Map.find indexes.Head pieces)],
                    mapCharToIndexes |> Map.add c indexes.Tail))
         ([], mapCharToIndexes) (Seq.toList word)
         
-let convertWordsToPieces words mapCharToIndexes pieces = 
-    List.map (fun word -> word |> convertStringToPiece mapCharToIndexes pieces) words
+let wordsToPieces words mapCharToIndexes pieces = 
+    List.map (fun word -> word |> stringToPiece mapCharToIndexes pieces) words
     |> List.map (fun x -> fst x)
 
 let findLegalWords words dictionary = 
@@ -201,7 +201,7 @@ let rec calculatePointsOfWord word =
 
 let playFirstMove center (state : State.state) dict =
     let legalWords = findLegalWords (createAnagramFromHand state.hand state.pieces) dict
-    let pieces = convertWordsToPieces legalWords (mapPiecesToIndexes state.pieces state.hand) state.pieces
+    let pieces = wordsToPieces legalWords (mapPiecesToIndexes state.pieces state.hand) state.pieces
                 |> List.sortByDescending (fun word -> calculatePointsOfWord word)
     
     match pieces with
@@ -214,7 +214,7 @@ let findBestWordForRow pieces hand charList length (dict: Dictionary) =
         findLegalWords words dict
         |> List.map (fun string -> string.Remove (0, (List.length charList)))
 
-    convertWordsToPieces legalWords (mapPiecesToIndexes pieces hand) pieces
+    wordsToPieces legalWords (mapPiecesToIndexes pieces hand) pieces
     |> List.map (fun x -> async { return calculatePointsOfWord x, x })
     |> Async.Parallel
     |> Async.RunSynchronously
@@ -234,7 +234,7 @@ let isTileEmpty (coord:coord) placed board boardRadius =
     let isOnBoard = (fst coord) < boardRadius+1 && (snd coord) < boardRadius+1
     (tileEmpty && isOnBoard) 
 
-let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY boardRadius =
+let emptySpace (coord:coord) (state:State.state) board moveX moveY boardRadius =
     let placedPieces = state.lettersPlaced
     let handSize = state.lettersPlaced |> Map.toList |> List.length
     
@@ -257,7 +257,7 @@ let emptyPlacesInDirection (coord:coord) (state:State.state) board moveX moveY b
         else acc
     numberOfEmpty coord 0
 
-let wordAdjacentToTile coord placed board moveX moveY radius =
+let neighbouringWord coord placed board moveX moveY radius =
     let rec inner coord value =
         match isTileEmpty coord placed board radius with
         | true  -> value
@@ -277,14 +277,14 @@ let findOccupiedTiles (state: State.state) : coord list =
 let findRowWithMostEmptyTiles board (state : State.state) radius =
     let mapEmptyPlaces list =
         List.map (fun coord ->
-            let xs = emptyPlacesInDirection coord state board 1 0 radius
-            let ys = emptyPlacesInDirection coord state board 0 1 radius
+            let xs = emptySpace coord state board 1 0 radius
+            let ys = emptySpace coord state board 0 1 radius
             (coord, xs, ys)) list
     
     let mapNeighbouringWords list =
         List.map (fun (coord, placesX, placesY) ->
-            ((wordAdjacentToTile coord state.lettersPlaced board -1 0 radius,
-              wordAdjacentToTile coord state.lettersPlaced board 0 -1 radius),
+            ((neighbouringWord coord state.lettersPlaced board -1 0 radius,
+              neighbouringWord coord state.lettersPlaced board 0 -1 radius),
              (coord, placesX, placesY))) list
     
     let update list =
